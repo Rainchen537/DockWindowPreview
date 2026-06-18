@@ -32,43 +32,48 @@ enum AppIconFactory {
         subtleRing.lineWidth = 1 * scale
         subtleRing.stroke()
 
-        let glow = NSBezierPath(roundedRect: r(31, 32, 68, 66), xRadius: 19 * scale, yRadius: 19 * scale)
+        let accentStart = NSColor(calibratedRed: 0.50, green: 0.39, blue: 0.88, alpha: 1)
+        let accentEnd = NSColor(calibratedRed: 1.00, green: 0.57, blue: 0.48, alpha: 1)
+        let surface = NSBezierPath(roundedRect: r(32, 33, 64, 63), xRadius: 19 * scale, yRadius: 19 * scale)
         NSGradient(colors: [
-            NSColor(calibratedRed: 0.42, green: 0.28, blue: 0.80, alpha: 1),
-            NSColor(calibratedRed: 0.96, green: 0.42, blue: 0.52, alpha: 1),
-            NSColor(calibratedRed: 0.98, green: 0.70, blue: 0.45, alpha: 1)
-        ])?.draw(in: glow, angle: 315)
+            accentStart,
+            accentEnd
+        ])?.draw(in: surface, angle: 315)
 
-        let inner = NSBezierPath(roundedRect: r(39, 42, 52, 44), xRadius: 10 * scale, yRadius: 10 * scale)
-        NSColor(calibratedWhite: 1, alpha: 0.93).setFill()
-        inner.fill()
+        let surfaceHighlight = NSBezierPath(roundedRect: r(34, 35, 60, 59), xRadius: 17 * scale, yRadius: 17 * scale)
+        NSColor(calibratedWhite: 1, alpha: 0.12).setStroke()
+        surfaceHighlight.lineWidth = 1.4 * scale
+        surfaceHighlight.stroke()
 
-        drawPreviewWindow(rect: r(47, 68, 34, 18), radius: 5 * scale, accent: NSColor(calibratedRed: 0.42, green: 0.47, blue: 0.80, alpha: 1), scale: scale)
-        drawPreviewWindow(rect: r(40, 55, 34, 20), radius: 5 * scale, accent: NSColor(calibratedRed: 0.30, green: 0.58, blue: 0.92, alpha: 1), scale: scale)
-        drawPreviewWindow(rect: r(56, 51, 34, 24), radius: 6 * scale, accent: NSColor(calibratedRed: 0.96, green: 0.49, blue: 0.58, alpha: 1), scale: scale)
+        let backCard = NSBezierPath(roundedRect: r(47, 61, 39, 23), xRadius: 7 * scale, yRadius: 7 * scale)
+        NSColor(calibratedWhite: 1, alpha: 0.34).setFill()
+        backCard.fill()
 
-        let dockShadow = NSShadow()
-        dockShadow.shadowBlurRadius = 5 * scale
-        dockShadow.shadowOffset = NSSize(width: 0, height: -1.5 * scale)
-        dockShadow.shadowColor = NSColor(calibratedWhite: 0, alpha: 0.16)
+        let cardShadow = NSShadow()
+        cardShadow.shadowBlurRadius = 8 * scale
+        cardShadow.shadowOffset = NSSize(width: 0, height: -2 * scale)
+        cardShadow.shadowColor = NSColor(calibratedWhite: 0, alpha: 0.18)
         NSGraphicsContext.saveGraphicsState()
-        dockShadow.set()
-
-        let dock = NSBezierPath(roundedRect: r(38, 32, 52, 9), xRadius: 4.5 * scale, yRadius: 4.5 * scale)
-        NSGradient(colors: [
-            NSColor(calibratedRed: 0.16, green: 0.45, blue: 0.92, alpha: 1),
-            NSColor(calibratedRed: 0.35, green: 0.34, blue: 0.86, alpha: 1)
-        ])?.draw(in: dock, angle: 0)
+        cardShadow.set()
+        let mainCard = NSBezierPath(roundedRect: r(40, 49, 50, 31), xRadius: 8 * scale, yRadius: 8 * scale)
+        NSColor(calibratedWhite: 1, alpha: 0.94).setFill()
+        mainCard.fill()
         NSGraphicsContext.restoreGraphicsState()
 
-        for index in 0..<4 {
-            let dot = NSBezierPath(ovalIn: r(47 + CGFloat(index) * 9, 35, 4, 4))
-            NSColor(calibratedWhite: 1, alpha: index == 1 ? 0.95 : 0.56).setFill()
-            dot.fill()
-        }
+        let titleBar = NSBezierPath(roundedRect: r(45, 68, 40, 4), xRadius: 2 * scale, yRadius: 2 * scale)
+        accentStart.withAlphaComponent(0.20).setFill()
+        titleBar.fill()
 
-        let activeIndicator = NSBezierPath(ovalIn: r(61, 25, 7, 3))
-        NSColor(calibratedRed: 0.27, green: 0.50, blue: 1, alpha: 0.45).setFill()
+        let contentLine = NSBezierPath(roundedRect: r(48, 59, 34, 5), xRadius: 2.5 * scale, yRadius: 2.5 * scale)
+        NSColor(calibratedWhite: 0.72, alpha: 0.26).setFill()
+        contentLine.fill()
+
+        let dock = NSBezierPath(roundedRect: r(44, 38, 40, 7), xRadius: 3.5 * scale, yRadius: 3.5 * scale)
+        NSColor(calibratedWhite: 1, alpha: 0.72).setFill()
+        dock.fill()
+
+        let activeIndicator = NSBezierPath(roundedRect: r(58, 33, 12, 3), xRadius: 1.5 * scale, yRadius: 1.5 * scale)
+        NSColor(calibratedWhite: 1, alpha: 0.58).setFill()
         activeIndicator.fill()
 
         image.unlockFocus()
@@ -82,49 +87,18 @@ enum AppIconFactory {
         NSColor.black.setFill()
         NSColor.black.setStroke()
 
-        let back = NSBezierPath(roundedRect: NSRect(x: 3, y: 8, width: 8, height: 5.5), xRadius: 1.6, yRadius: 1.6)
-        back.lineWidth = 1.4
-        back.stroke()
-
-        let middle = NSBezierPath(roundedRect: NSRect(x: 7, y: 6, width: 8, height: 5.5), xRadius: 1.6, yRadius: 1.6)
-        middle.lineWidth = 1.4
-        middle.stroke()
-
-        let front = NSBezierPath(roundedRect: NSRect(x: 5, y: 3.5, width: 8, height: 5.5), xRadius: 1.6, yRadius: 1.6)
-        front.lineWidth = 1.4
+        let front = NSBezierPath(roundedRect: NSRect(x: 4, y: 6, width: 10, height: 7.5), xRadius: 2, yRadius: 2)
+        front.lineWidth = 1.6
         front.stroke()
 
-        let dock = NSBezierPath(roundedRect: NSRect(x: 4, y: 1.5, width: 10, height: 1.8), xRadius: 0.9, yRadius: 0.9)
+        let titleLine = NSBezierPath(roundedRect: NSRect(x: 6, y: 10.8, width: 6, height: 1.4), xRadius: 0.7, yRadius: 0.7)
+        titleLine.fill()
+
+        let dock = NSBezierPath(roundedRect: NSRect(x: 3, y: 2.5, width: 12, height: 2.2), xRadius: 1.1, yRadius: 1.1)
         dock.fill()
 
         image.unlockFocus()
         image.isTemplate = true
         return image
-    }
-
-    private static func drawPreviewWindow(rect: NSRect, radius: CGFloat, accent: NSColor, scale: CGFloat) {
-        let shadow = NSShadow()
-        shadow.shadowBlurRadius = 7 * scale
-        shadow.shadowOffset = NSSize(width: 0, height: -2 * scale)
-        shadow.shadowColor = NSColor(calibratedWhite: 0, alpha: 0.18)
-        NSGraphicsContext.saveGraphicsState()
-        shadow.set()
-
-        let body = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
-        NSColor(calibratedWhite: 1, alpha: 0.96).setFill()
-        body.fill()
-        NSGraphicsContext.restoreGraphicsState()
-
-        let titleBar = NSBezierPath(roundedRect: NSRect(x: rect.minX, y: rect.maxY - 6 * scale, width: rect.width, height: 6 * scale), xRadius: radius, yRadius: radius)
-        accent.withAlphaComponent(0.22).setFill()
-        titleBar.fill()
-
-        let lineOne = NSBezierPath(roundedRect: NSRect(x: rect.minX + 6 * scale, y: rect.minY + rect.height * 0.44, width: rect.width - 12 * scale, height: 3 * scale), xRadius: 1.5 * scale, yRadius: 1.5 * scale)
-        accent.withAlphaComponent(0.18).setFill()
-        lineOne.fill()
-
-        let lineTwo = NSBezierPath(roundedRect: NSRect(x: rect.minX + 6 * scale, y: rect.minY + rect.height * 0.25, width: rect.width * 0.56, height: 3 * scale), xRadius: 1.5 * scale, yRadius: 1.5 * scale)
-        NSColor(calibratedWhite: 0.68, alpha: 0.28).setFill()
-        lineTwo.fill()
     }
 }

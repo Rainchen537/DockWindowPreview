@@ -15,21 +15,38 @@ struct WindowInfo: Hashable, Identifiable {
 }
 
 final class WindowCollector {
+    private struct CGWindowCandidate {
+        let windowID: CGWindowID
+        let title: String
+        let bounds: CGRect
+        let ownerName: String
+    }
+
+    private enum AXAttributeNames {
+        // Best-effort public Accessibility attribute. Several apps remove
+        // minimized windows from AXWindows and expose them only here.
+        static let minimizedWindows = "AXMinimizedWindows"
+    }
+
     func windows(for app: NSRunningApplication) -> [WindowInfo] {
         windows(for: app.processIdentifier, fallbackOwnerName: app.localizedName ?? "Unknown App")
     }
 
     func windows(for processIdentifier: pid_t, fallbackOwnerName: String = "Unknown App") -> [WindowInfo] {
-        let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
-        guard let rawWindows = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
+        // Do not use optionOnScreenOnly here. Some minimized windows still have
+        // a CG window record with kCGWindowIsOnscreen = false; keeping those
+        // candidates gives us a chance to reuse a real CGWindowID for capture.
+        let options: CGWindowListOption = [.excludeDesktopElements]
+        let rawWindows = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]]
+        if rawWindows == nil {
             DWLog("CGWindowListCopyWindowInfo returned no window list")
-            return []
         }
 
         var seenWindowIDs = Set<CGWindowID>()
         var results: [WindowInfo] = []
+        var offscreenCandidates: [CGWindowCandidate] = []
 
-        for dictionary in rawWindows {
+        for dictionary in rawWindows ?? [] {
             guard
                 let ownerPID = dictionary[kCGWindowOwnerPID as String] as? pid_t,
                 ownerPID == processIdentifier,
@@ -42,10 +59,9 @@ final class WindowCollector {
             }
 
             let isOnscreen = (dictionary[kCGWindowIsOnscreen as String] as? Bool) ?? false
-            guard isOnscreen else { continue }
 
             let alpha = (dictionary[kCGWindowAlpha as String] as? Double) ?? 1
-            guard alpha > 0.01 else { continue }
+            if isOnscreen, alpha <= 0.01 { continue }
 
             guard
                 let boundsDictionary = dictionary[kCGWindowBounds as String] as? NSDictionary,
@@ -59,6 +75,20 @@ final class WindowCollector {
             let title = (dictionary[kCGWindowName as String] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
             let ownerName = (dictionary[kCGWindowOwnerName as String] as? String) ?? fallbackOwnerName
             let displayTitle = title?.isEmpty == false ? title! : ownerName
+
+            guard isLikelyUserWindow(title: title, ownerName: ownerName, bounds: bounds) else {
+                continue
+            }
+
+            if !isOnscreen {
+                offscreenCandidates.append(CGWindowCandidate(
+                    windowID: windowNumber,
+                    title: displayTitle,
+                    bounds: bounds,
+                    ownerName: ownerName
+                ))
+                continue
+            }
 
             seenWindowIDs.insert(windowNumber)
             results.append(WindowInfo(
@@ -74,7 +104,8 @@ final class WindowCollector {
         appendMinimizedAXWindows(
             to: &results,
             processIdentifier: processIdentifier,
-            fallbackOwnerName: fallbackOwnerName
+            fallbackOwnerName: fallbackOwnerName,
+            offscreenCandidates: offscreenCandidates
         )
 
         return results
@@ -83,18 +114,35 @@ final class WindowCollector {
     private func appendMinimizedAXWindows(
         to results: inout [WindowInfo],
         processIdentifier: pid_t,
-        fallbackOwnerName: String
+        fallbackOwnerName: String,
+        offscreenCandidates: [CGWindowCandidate]
     ) {
         guard AXIsProcessTrusted() else { return }
 
         let appElement = AXUIElementCreateApplication(processIdentifier)
-        guard let axWindows = attribute(appElement, kAXWindowsAttribute) as [AXUIElement]? else {
+        let axWindows = attribute(appElement, kAXWindowsAttribute) as [AXUIElement]? ?? []
+        let axMinimizedWindows = attribute(appElement, AXAttributeNames.minimizedWindows) as [AXUIElement]? ?? []
+        let minimizedWindows = uniqueAXWindows(
+            axMinimizedWindows + axWindows.filter { (attribute($0, kAXMinimizedAttribute) as Bool?) == true }
+        )
+
+        if minimizedWindows.isEmpty {
+            DWLog("No minimized AX windows for pid \(processIdentifier)")
             return
         }
 
         var syntheticIndex: UInt32 = 0
-        for axWindow in axWindows {
-            guard (attribute(axWindow, kAXMinimizedAttribute) as Bool?) == true else {
+        for axWindow in minimizedWindows {
+            // AXMinimizedWindows is already the authoritative minimized list for
+            // many apps. Keep the flag permissive because some apps do not return
+            // AXMinimized reliably on those elements.
+            let isMinimized = (attribute(axWindow, kAXMinimizedAttribute) as Bool?) ?? true
+            guard isMinimized else {
+                continue
+            }
+
+            if let role = attribute(axWindow, kAXRoleAttribute) as String?,
+               role != kAXWindowRole {
                 continue
             }
 
@@ -102,6 +150,8 @@ final class WindowCollector {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             let displayTitle = title.isEmpty ? fallbackOwnerName : title
             let bounds = frame(of: axWindow) ?? CGRect(x: 0, y: 0, width: 900, height: 560)
+            let fallbackBounds = bounds.width >= 40 && bounds.height >= 40 ? bounds : CGRect(x: 0, y: 0, width: 900, height: 560)
+            let cgCandidate = bestCGCandidate(forTitle: displayTitle, bounds: fallbackBounds, in: offscreenCandidates)
 
             if results.contains(where: { existing in
                 normalize(existing.title) == normalize(displayTitle)
@@ -113,19 +163,77 @@ final class WindowCollector {
 
             syntheticIndex += 1
             results.append(WindowInfo(
-                windowID: syntheticWindowID(
+                windowID: cgCandidate?.windowID ?? syntheticWindowID(
                     processIdentifier: processIdentifier,
                     title: displayTitle,
-                    bounds: bounds,
+                    bounds: fallbackBounds,
                     index: syntheticIndex
                 ),
                 title: displayTitle,
-                bounds: bounds.width >= 40 && bounds.height >= 40 ? bounds : CGRect(x: 0, y: 0, width: 900, height: 560),
+                bounds: fallbackBounds,
                 ownerPID: processIdentifier,
-                ownerName: fallbackOwnerName,
+                ownerName: cgCandidate?.ownerName ?? fallbackOwnerName,
                 isMinimized: true
             ))
+
+            if let cgCandidate {
+                DWLog("Matched minimized AX window '\(displayTitle)' to offscreen CG window \(cgCandidate.windowID)")
+            }
         }
+
+        DWLog("Collected \(syntheticIndex) minimized AX windows for pid \(processIdentifier)")
+    }
+
+    private func bestCGCandidate(forTitle title: String, bounds: CGRect, in candidates: [CGWindowCandidate]) -> CGWindowCandidate? {
+        var best: (candidate: CGWindowCandidate, score: Int)?
+
+        for candidate in candidates {
+            var score = 0
+            let normalizedCandidateTitle = normalize(candidate.title)
+            let normalizedTitle = normalize(title)
+
+            if !normalizedCandidateTitle.isEmpty, !normalizedTitle.isEmpty {
+                if normalizedCandidateTitle == normalizedTitle {
+                    score += 80
+                } else if normalizedCandidateTitle.contains(normalizedTitle) || normalizedTitle.contains(normalizedCandidateTitle) {
+                    score += 35
+                }
+            }
+
+            if abs(candidate.bounds.width - bounds.width) < 16 {
+                score += 12
+            }
+            if abs(candidate.bounds.height - bounds.height) < 16 {
+                score += 12
+            }
+
+            if score > (best?.score ?? 0) {
+                best = (candidate, score)
+            }
+        }
+
+        guard let best, best.score >= 40 else { return nil }
+        return best.candidate
+    }
+
+    private func isLikelyUserWindow(title: String?, ownerName: String, bounds: CGRect) -> Bool {
+        let hasUsefulTitle = title?.isEmpty == false || !ownerName.isEmpty
+        guard hasUsefulTitle else { return false }
+        guard bounds.width >= 40, bounds.height >= 40 else { return false }
+        return true
+    }
+
+    private func uniqueAXWindows(_ windows: [AXUIElement]) -> [AXUIElement] {
+        var seen = Set<CFHashCode>()
+        var unique: [AXUIElement] = []
+
+        for window in windows {
+            let hash = CFHash(window)
+            guard seen.insert(hash).inserted else { continue }
+            unique.append(window)
+        }
+
+        return unique
     }
 
     private func syntheticWindowID(processIdentifier: pid_t, title: String, bounds: CGRect, index: UInt32) -> CGWindowID {

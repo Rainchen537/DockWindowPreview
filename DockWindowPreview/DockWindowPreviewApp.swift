@@ -10,6 +10,7 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
     private let thumbnailProvider = WindowThumbnailProvider()
     private let windowActivator = WindowActivator()
     private let dockInspector = DockInspector()
+    private let updateChecker = UpdateChecker.shared
 
     private struct PreviewContext {
         let appPID: pid_t
@@ -19,9 +20,7 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem?
     private var statusMenu: NSMenu?
-    private var menuAnchorPanel: NSPanel?
-    private var fallbackMenuPanel: NSPanel?
-    private var settingsWindowController: SettingsWindowController?
+    private var settingsPopoverController: SettingsPopoverController?
     private var previewContext: PreviewContext?
 
     private lazy var previewPanel: PreviewPanel = {
@@ -63,6 +62,7 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
             permissionsManager.showInitialPermissionGuidanceIfNeeded()
         }
         mouseTracker.start()
+        scheduleStartupUpdateCheck()
         DWLog("DockWindowPreview launched")
     }
 
@@ -117,6 +117,7 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
         menu.addItem(menuItem(title: "请求隐私权限", action: #selector(requestPrivacyPermissions)))
         menu.addItem(menuItem(title: "打开 Accessibility 权限", action: #selector(openAccessibilitySettings)))
         menu.addItem(menuItem(title: "打开屏幕录制权限", action: #selector(openScreenCaptureSettings)))
+        menu.addItem(menuItem(title: "GitHub", action: #selector(openGitHub)))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(menuItem(title: "退出", action: #selector(quit), keyEquivalent: "q"))
         return menu
@@ -133,9 +134,9 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
         let shouldShowMenu = event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true
 
         if shouldShowMenu {
-            showFallbackMenuPanel()
+            showStatusMenu(from: sender)
         } else {
-            openSettingsAndRequestPermissions()
+            toggleSettingsPopover(relativeTo: sender, requestPermissions: true)
         }
     }
 
@@ -146,116 +147,15 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
         guard arguments.contains("--show-status-menu") else { return false }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
-            NSLog("[DockWindowPreview] showing fallback menu panel")
-            self?.showFallbackMenuPanel()
+            NSLog("[DockWindowPreview] showing settings popover")
+            self?.showSettingsPopover(requestPermissions: false)
         }
         return true
     }
 
-    private func showStatusMenuAtTopRight() {
-        guard let statusMenu else { return }
-        NSApp.activate(ignoringOtherApps: true)
-
-        let visibleFrame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let anchorFrame = NSRect(x: visibleFrame.maxX - 260, y: visibleFrame.maxY - 24, width: 1, height: 1)
-        let panel = NSPanel(
-            contentRect: anchorFrame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        panel.backgroundColor = .clear
-        panel.isOpaque = false
-        panel.hasShadow = false
-        panel.level = .statusBar
-        panel.collectionBehavior = [.canJoinAllSpaces, .stationary]
-
-        let anchorView = NSView(frame: NSRect(x: 0, y: 0, width: 1, height: 1))
-        panel.contentView = anchorView
-        menuAnchorPanel = panel
-        panel.orderFrontRegardless()
-
-        statusMenu.popUp(positioning: nil, at: NSPoint(x: 0, y: 0), in: anchorView)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self, weak panel] in
-            panel?.orderOut(nil)
-            if self?.menuAnchorPanel === panel {
-                self?.menuAnchorPanel = nil
-            }
-        }
-    }
-
-    private func showFallbackMenuPanel() {
-        NSLog("[DockWindowPreview] showFallbackMenuPanel invoked")
-        fallbackMenuPanel?.orderOut(nil)
-
-        let visibleFrame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let panelSize = NSSize(width: 280, height: 240)
-        let origin = NSPoint(x: visibleFrame.midX - panelSize.width / 2, y: visibleFrame.midY - panelSize.height / 2)
-
-        let panel = NSPanel(
-            contentRect: NSRect(origin: origin, size: panelSize),
-            styleMask: [.titled, .closable, .utilityWindow],
-            backing: .buffered,
-            defer: false
-        )
-        panel.title = "DockWindowPreview 菜单"
-        panel.level = .floating
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
-        panel.isOpaque = true
-        panel.backgroundColor = .windowBackgroundColor
-        panel.hasShadow = true
-
-        let rootView = NSVisualEffectView(frame: NSRect(origin: .zero, size: panelSize))
-        rootView.material = .sidebar
-        rootView.blendingMode = .behindWindow
-        rootView.state = .active
-        rootView.wantsLayer = true
-
-        let stack = NSStackView()
-        stack.orientation = .vertical
-        stack.spacing = 8
-        stack.edgeInsets = NSEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        rootView.addSubview(stack)
-
-        stack.addArrangedSubview(fallbackMenuButton(title: "设置...", action: #selector(openSettings)))
-        stack.addArrangedSubview(fallbackMenuButton(title: "请求隐私权限", action: #selector(requestPrivacyPermissions)))
-        stack.addArrangedSubview(separatorLine())
-        stack.addArrangedSubview(fallbackMenuButton(title: "打开 Accessibility 权限", action: #selector(openAccessibilitySettings)))
-        stack.addArrangedSubview(fallbackMenuButton(title: "打开屏幕录制权限", action: #selector(openScreenCaptureSettings)))
-        stack.addArrangedSubview(separatorLine())
-        stack.addArrangedSubview(fallbackMenuButton(title: "退出 DockWindowPreview", action: #selector(quit)))
-
-        NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: rootView.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: rootView.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: rootView.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: rootView.bottomAnchor)
-        ])
-
-        panel.contentView = rootView
-        fallbackMenuPanel = panel
-        NSApp.activate(ignoringOtherApps: true)
-        panel.makeKeyAndOrderFront(nil)
-    }
-
-    private func fallbackMenuButton(title: String, action: Selector) -> NSButton {
-        let button = NSButton(title: title, target: self, action: action)
-        button.isBordered = false
-        button.alignment = .left
-        button.font = NSFont.systemFont(ofSize: 13)
-        button.contentTintColor = .labelColor
-        button.setButtonType(.momentaryPushIn)
-        button.bezelStyle = .rounded
-        button.heightAnchor.constraint(equalToConstant: 28).isActive = true
-        return button
-    }
-
-    private func separatorLine() -> NSBox {
-        let box = NSBox()
-        box.boxType = .separator
-        return box
+    private func showStatusMenu(from button: NSStatusBarButton) {
+        settingsPopoverController?.close()
+        statusMenu?.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.minY), in: button)
     }
 
     private func showPreview(for dockItem: DockItem, anchor: NSPoint) {
@@ -317,10 +217,65 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
     }
 
     private func openSettingsAndRequestPermissions() {
-        if settingsWindowController == nil {
-            settingsWindowController = SettingsWindowController(settings: settings, permissionsManager: permissionsManager)
+        showSettingsPopover(requestPermissions: true)
+    }
+
+    private func toggleSettingsPopover(relativeTo button: NSStatusBarButton, requestPermissions: Bool) {
+        if settingsPopoverController == nil {
+            settingsPopoverController = SettingsPopoverController(
+                settings: settings,
+                permissionsManager: permissionsManager,
+                updateChecker: updateChecker
+            )
         }
-        settingsWindowController?.show(requestPermissions: true)
+        settingsPopoverController?.toggle(relativeTo: button, requestPermissions: requestPermissions)
+    }
+
+    private func showSettingsPopover(requestPermissions: Bool) {
+        guard let button = statusItem?.button else { return }
+        if settingsPopoverController == nil {
+            settingsPopoverController = SettingsPopoverController(
+                settings: settings,
+                permissionsManager: permissionsManager,
+                updateChecker: updateChecker
+            )
+        }
+        settingsPopoverController?.show(relativeTo: button, requestPermissions: requestPermissions)
+    }
+
+    private func scheduleStartupUpdateCheck() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+            self?.checkForUpdatesOnLaunch()
+        }
+    }
+
+    private func checkForUpdatesOnLaunch() {
+        updateChecker.checkForUpdates { [weak self] result in
+            DispatchQueue.main.async {
+                switch result {
+                case .updateAvailable(_, let latest):
+                    self?.showStartupUpdateAlert(latest)
+                case .upToDate(let currentVersion, _):
+                    DWLog("Update check: current version \(currentVersion) is up to date")
+                case .failure(let error):
+                    DWLog("Startup update check failed: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    private func showStartupUpdateAlert(_ release: UpdateChecker.ReleaseInfo) {
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "DockWindowPreview 有新版本 \(release.displayVersion)"
+        alert.informativeText = "\(release.name)\n\n是否打开下载页面？"
+        alert.addButton(withTitle: "打开下载页面")
+        alert.addButton(withTitle: "稍后")
+
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn {
+            updateChecker.openDownloadOrReleasePage(release)
+        }
     }
 
     @objc private func openAccessibilitySettings() {
@@ -333,6 +288,11 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
 
     @objc private func requestPrivacyPermissions() {
         _ = permissionsManager.requestMissingPrivacyPermissions()
+    }
+
+    @objc private func openGitHub() {
+        guard let url = URL(string: "https://github.com/Rainchen537/DockWindowPreview") else { return }
+        NSWorkspace.shared.open(url)
     }
 
     @objc private func requestScreenCapturePermission() {

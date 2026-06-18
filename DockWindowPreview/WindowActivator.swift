@@ -3,6 +3,12 @@ import ApplicationServices
 import Foundation
 
 final class WindowActivator {
+    private enum AXAttributeNames {
+        // Best-effort public Accessibility attribute. Some apps keep minimized
+        // windows outside AXWindows until they are restored.
+        static let minimizedWindows = "AXMinimizedWindows"
+    }
+
     private var axWindowCache: [CGWindowID: AXUIElement] = [:]
 
     func activate(_ window: WindowInfo) {
@@ -81,24 +87,32 @@ final class WindowActivator {
             }
         }
 
-        let appFocusError = AXUIElementSetAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, matchingWindow)
-        if appFocusError != AXError.success {
-            DWLog("Setting AXFocusedWindow failed for '\(targetWindow.title)': \(appFocusError.rawValue)")
+        let focusWork = {
+            let appFocusError = AXUIElementSetAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, matchingWindow)
+            if appFocusError != AXError.success {
+                DWLog("Setting AXFocusedWindow failed for '\(targetWindow.title)': \(appFocusError.rawValue)")
+            }
+
+            let raiseError = AXUIElementPerformAction(matchingWindow, kAXRaiseAction as CFString)
+            if raiseError != AXError.success {
+                DWLog("AXRaise failed for '\(targetWindow.title)': \(raiseError.rawValue)")
+            }
+
+            let mainError = AXUIElementSetAttributeValue(matchingWindow, kAXMainAttribute as CFString, kCFBooleanTrue)
+            if mainError != AXError.success {
+                DWLog("Setting AXMain failed for '\(targetWindow.title)': \(mainError.rawValue)")
+            }
+
+            let focusedError = AXUIElementSetAttributeValue(matchingWindow, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+            if focusedError != AXError.success {
+                DWLog("Setting AXFocused failed for '\(targetWindow.title)': \(focusedError.rawValue)")
+            }
         }
 
-        let raiseError = AXUIElementPerformAction(matchingWindow, kAXRaiseAction as CFString)
-        if raiseError != AXError.success {
-            DWLog("AXRaise failed for '\(targetWindow.title)': \(raiseError.rawValue)")
-        }
-
-        let mainError = AXUIElementSetAttributeValue(matchingWindow, kAXMainAttribute as CFString, kCFBooleanTrue)
-        if mainError != AXError.success {
-            DWLog("Setting AXMain failed for '\(targetWindow.title)': \(mainError.rawValue)")
-        }
-
-        let focusedError = AXUIElementSetAttributeValue(matchingWindow, kAXFocusedAttribute as CFString, kCFBooleanTrue)
-        if focusedError != AXError.success {
-            DWLog("Setting AXFocused failed for '\(targetWindow.title)': \(focusedError.rawValue)")
+        if targetWindow.isMinimized {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.06, execute: focusWork)
+        } else {
+            focusWork()
         }
     }
 
@@ -108,7 +122,8 @@ final class WindowActivator {
             return cachedWindow
         }
 
-        guard let axWindows = attribute(appElement, kAXWindowsAttribute) as [AXUIElement]? else {
+        let axWindows = candidateWindows(for: appElement)
+        guard !axWindows.isEmpty else {
             DWLog("No AX windows available for pid \(targetWindow.ownerPID)")
             return nil
         }
@@ -119,6 +134,25 @@ final class WindowActivator {
 
         axWindowCache[targetWindow.windowID] = matchingWindow
         return matchingWindow
+    }
+
+    private func candidateWindows(for appElement: AXUIElement) -> [AXUIElement] {
+        let normalWindows = attribute(appElement, kAXWindowsAttribute) as [AXUIElement]? ?? []
+        let minimizedWindows = attribute(appElement, AXAttributeNames.minimizedWindows) as [AXUIElement]? ?? []
+        return uniqueAXWindows(normalWindows + minimizedWindows)
+    }
+
+    private func uniqueAXWindows(_ windows: [AXUIElement]) -> [AXUIElement] {
+        var seen = Set<CFHashCode>()
+        var unique: [AXUIElement] = []
+
+        for window in windows {
+            let hash = CFHash(window)
+            guard seen.insert(hash).inserted else { continue }
+            unique.append(window)
+        }
+
+        return unique
     }
 
     private func bestMatch(for targetWindow: WindowInfo, in axWindows: [AXUIElement]) -> AXUIElement? {

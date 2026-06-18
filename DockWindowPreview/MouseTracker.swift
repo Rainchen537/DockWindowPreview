@@ -11,9 +11,11 @@ final class MouseTracker {
     private var globalMonitor: Any?
     private var localMonitor: Any?
     private var hoverWorkItem: DispatchWorkItem?
+    private var leaveWorkItem: DispatchWorkItem?
     private var currentHoverIdentity: String?
     private var lastHandledAt: TimeInterval = 0
     private let throttleInterval: TimeInterval = 0.035
+    private let leaveDelay: TimeInterval = 0.020
 
     init(dockInspector: DockInspector, settings: AppSettings = .shared) {
         self.dockInspector = dockInspector
@@ -46,6 +48,7 @@ final class MouseTracker {
         globalMonitor = nil
         localMonitor = nil
         cancelPendingHover()
+        cancelPendingLeave()
     }
 
     private func handleMouseMove(at point: NSPoint) {
@@ -61,23 +64,25 @@ final class MouseTracker {
         lastHandledAt = now
 
         if isPointInsidePreviewPanel?(point) == true {
+            cancelPendingLeave()
             return
         }
 
         guard let region = dockInspector.dockRegion(containing: point), region.frame.insetBy(dx: -6, dy: -6).contains(point) else {
             currentHoverIdentity = nil
             cancelPendingHover()
-            onMouseLeftDockAndPreview?()
+            scheduleLeave()
             return
         }
 
         guard let item = dockInspector.dockItem(at: point, in: region), item.runningApplication != nil else {
             currentHoverIdentity = nil
             cancelPendingHover()
-            onMouseLeftDockAndPreview?()
+            scheduleLeave()
             return
         }
 
+        cancelPendingLeave()
         guard currentHoverIdentity != item.identity else { return }
         currentHoverIdentity = item.identity
         scheduleHover(for: item, at: point)
@@ -98,5 +103,22 @@ final class MouseTracker {
     private func cancelPendingHover() {
         hoverWorkItem?.cancel()
         hoverWorkItem = nil
+    }
+
+    private func scheduleLeave() {
+        guard leaveWorkItem == nil else { return }
+
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.leaveWorkItem = nil
+            self?.onMouseLeftDockAndPreview?()
+        }
+
+        leaveWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + leaveDelay, execute: workItem)
+    }
+
+    private func cancelPendingLeave() {
+        leaveWorkItem?.cancel()
+        leaveWorkItem = nil
     }
 }

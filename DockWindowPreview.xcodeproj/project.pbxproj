@@ -22,6 +22,7 @@
 		100000000000000000000013 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000115 /* AppIcon.icns */; };
 		100000000000000000000014 /* LaunchAtLoginManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000116 /* LaunchAtLoginManager.swift */; };
 		100000000000000000000015 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000117 /* UpdateChecker.swift */; };
+		100000000000000000000016 /* SettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000118 /* SettingsComponents.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +43,7 @@
 		100000000000000000000115 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
 		100000000000000000000116 /* LaunchAtLoginManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginManager.swift; sourceTree = "<group>"; };
 		100000000000000000000117 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
+		100000000000000000000118 /* SettingsComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsComponents.swift; sourceTree = "<group>"; };
 		100000000000000000000201 /* DockWindowPreview.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DockWindowPreview.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -79,6 +81,7 @@
 				100000000000000000000108 /* PreviewPanel.swift */,
 				100000000000000000000109 /* WindowActivator.swift */,
 				100000000000000000000110 /* SettingsWindow.swift */,
+				100000000000000000000118 /* SettingsComponents.swift */,
 				100000000000000000000114 /* AppIconFactory.swift */,
 				100000000000000000000116 /* LaunchAtLoginManager.swift */,
 				100000000000000000000117 /* UpdateChecker.swift */,
@@ -179,6 +182,7 @@
 				100000000000000000000012 /* AppIconFactory.swift in Sources */,
 				100000000000000000000014 /* LaunchAtLoginManager.swift in Sources */,
 				100000000000000000000015 /* UpdateChecker.swift in Sources */,
+				100000000000000000000016 /* SettingsComponents.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -307,7 +311,7 @@
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_LANGUAGE = en;
 				DEVELOPMENT_TEAM = A94225N8T5;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -318,7 +322,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.lixingchen.DockWindowPreview;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -332,7 +336,7 @@
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_LANGUAGE = en;
 				DEVELOPMENT_TEAM = A94225N8T5;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -343,7 +347,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.lixingchen.DockWindowPreview;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;

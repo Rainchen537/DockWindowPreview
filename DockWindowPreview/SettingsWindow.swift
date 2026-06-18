@@ -61,13 +61,13 @@ private final class SettingsViewController: NSViewController {
     private let githubURL = URL(string: "https://github.com/Rainchen537/DockWindowPreview")!
 
     private let hoverDelaySlider = NSSlider(value: 0.10, minValue: 0.05, maxValue: 0.8, target: nil, action: nil)
-    private let hoverDelayValuePill = PillLabel(text: "100 ms", tone: .accent)
+    private let hoverDelayValuePill = SettingsPill(text: "100 ms", tone: .accent)
     private let thumbnailSlider = NSSlider(value: 150, minValue: 100, maxValue: 260, target: nil, action: nil)
-    private let thumbnailValuePill = PillLabel(text: "150 px", tone: .neutral)
-    private let launchAtLoginStatusPill = PillLabel(text: "未开启", tone: .neutral)
-    private let updateStatusPill = PillLabel(text: "", tone: .neutral)
-    private let accessibilityStatusPill = PillLabel(text: "检测中", tone: .neutral)
-    private let screenCaptureStatusPill = PillLabel(text: "检测中", tone: .neutral)
+    private let thumbnailValuePill = SettingsPill(text: "150 px", tone: .neutral)
+    private let launchAtLoginStatusPill = SettingsPill(text: "未开启", tone: .neutral)
+    private let updateStatusPill = SettingsPill(text: "", tone: .neutral)
+    private let accessibilityStatusPill = SettingsPill(text: "检测中", tone: .neutral)
+    private let screenCaptureStatusPill = SettingsPill(text: "检测中", tone: .neutral)
 
     private lazy var showTitleSwitch = makeSwitch(action: #selector(showTitleChanged(_:)))
     private lazy var launchAtLoginSwitch = makeSwitch(action: #selector(launchAtLoginChanged(_:)))
@@ -95,7 +95,7 @@ private final class SettingsViewController: NSViewController {
         self.launchAtLoginManager = launchAtLoginManager
         self.updateChecker = updateChecker
         super.init(nibName: nil, bundle: nil)
-        preferredContentSize = NSSize(width: 390, height: 560)
+        preferredContentSize = NSSize(width: SettingsUI.panelWidth, height: SettingsUI.panelHeight)
     }
 
     required init?(coder: NSCoder) {
@@ -108,11 +108,7 @@ private final class SettingsViewController: NSViewController {
     }
 
     override func loadView() {
-        let rootView = NSVisualEffectView()
-        rootView.material = .popover
-        rootView.blendingMode = .behindWindow
-        rootView.state = .active
-        rootView.translatesAutoresizingMaskIntoConstraints = false
+        let rootView = SettingsUI.rootView()
         view = rootView
 
         buildUI(in: rootView)
@@ -149,13 +145,14 @@ private final class SettingsViewController: NSViewController {
         thumbnailSlider.action = #selector(thumbnailSizeChanged(_:))
         updateStatusPill.setText("v\(updateChecker.currentVersion)", tone: .neutral)
 
-        let stack = NSStackView()
-        stack.orientation = .vertical
-        stack.spacing = 12
-        stack.alignment = .centerX
-        stack.edgeInsets = NSEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        rootView.addSubview(stack)
+        let scrollView = SettingsUI.scrollView()
+        let documentView = NSView()
+        documentView.translatesAutoresizingMaskIntoConstraints = false
+        let stack = SettingsUI.contentStack()
+
+        documentView.addSubview(stack)
+        scrollView.documentView = documentView
+        rootView.addSubview(scrollView)
 
         stack.addArrangedSubview(headerView())
         stack.addArrangedSubview(previewCard())
@@ -164,72 +161,54 @@ private final class SettingsViewController: NSViewController {
         stack.addArrangedSubview(aboutCard())
 
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: rootView.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: rootView.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: rootView.topAnchor),
-            stack.bottomAnchor.constraint(lessThanOrEqualTo: rootView.bottomAnchor)
+            scrollView.leadingAnchor.constraint(equalTo: rootView.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: rootView.trailingAnchor),
+            scrollView.topAnchor.constraint(equalTo: rootView.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: rootView.bottomAnchor),
+
+            documentView.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
+            documentView.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
+            documentView.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
+            documentView.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
+
+            stack.leadingAnchor.constraint(equalTo: documentView.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: documentView.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: documentView.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: documentView.bottomAnchor)
         ])
     }
 
     private func headerView() -> NSView {
-        let iconView = NSImageView(image: AppIconFactory.appIcon(size: 42))
-        iconView.imageScaling = .scaleProportionallyUpOrDown
-        iconView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            iconView.widthAnchor.constraint(equalToConstant: 42),
-            iconView.heightAnchor.constraint(equalToConstant: 42)
-        ])
-
-        let titleLabel = NSTextField(labelWithString: "DockWindowPreview")
-        titleLabel.font = NSFont.systemFont(ofSize: 18, weight: .semibold)
-        titleLabel.lineBreakMode = .byTruncatingTail
-
-        let subtitleLabel = NSTextField(labelWithString: "Dock 多窗口预览 · v\(updateChecker.currentVersion)")
-        subtitleLabel.font = NSFont.systemFont(ofSize: 12, weight: .regular)
-        subtitleLabel.textColor = .secondaryLabelColor
-        subtitleLabel.lineBreakMode = .byTruncatingTail
-
-        let textStack = NSStackView(views: [titleLabel, subtitleLabel])
-        textStack.orientation = .vertical
-        textStack.spacing = 2
-        textStack.alignment = .leading
-
-        let row = NSStackView(views: [iconView, textStack, spacer()])
-        row.orientation = .horizontal
-        row.spacing = 11
-        row.alignment = .centerY
-        row.widthAnchor.constraint(equalToConstant: 350).isActive = true
-
-        textStack.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        return row
+        SettingsHeaderView(
+            icon: AppIconFactory.appIcon(size: 52),
+            title: "DockWindowPreview",
+            subtitle: "Dock 多窗口预览 · v\(updateChecker.currentVersion)"
+        )
     }
 
     private func previewCard() -> NSView {
-        let card = SettingsCardView()
-        card.stack.addArrangedSubview(sectionHeader(title: "预览", symbolName: "rectangle.3.group"))
+        let card = SettingsCardView(title: "预览", symbolName: "rectangle.3.group")
         card.stack.addArrangedSubview(sliderRow(title: "悬停延迟", slider: hoverDelaySlider, valueLabel: hoverDelayValuePill))
         card.stack.addArrangedSubview(sliderRow(title: "缩略图高度", slider: thumbnailSlider, valueLabel: thumbnailValuePill))
-        card.stack.addArrangedSubview(divider())
+        card.stack.addArrangedSubview(SettingsUI.divider())
         card.stack.addArrangedSubview(switchRow(title: "显示窗口标题", trailingView: showTitleSwitch))
         card.stack.addArrangedSubview(switchRow(title: "启用调试日志", trailingView: debugSwitch))
         return card
     }
 
     private func systemCard() -> NSView {
-        let card = SettingsCardView()
-        card.stack.addArrangedSubview(sectionHeader(title: "系统", symbolName: "power"))
-        card.stack.addArrangedSubview(statusSwitchRow(
+        let card = SettingsCardView(title: "系统", symbolName: "power")
+        card.stack.addArrangedSubview(statusSwitchActionRow(
             title: "开机启动",
             statusPill: launchAtLoginStatusPill,
-            switchControl: launchAtLoginSwitch
+            switchControl: launchAtLoginSwitch,
+            actionButton: openLoginItemsButton
         ))
-        card.stack.addArrangedSubview(actionRow(primary: openLoginItemsButton))
         return card
     }
 
     private func permissionsCard() -> NSView {
-        let card = SettingsCardView()
-        card.stack.addArrangedSubview(sectionHeader(title: "权限", symbolName: "lock.shield"))
+        let card = SettingsCardView(title: "权限", symbolName: "lock.shield")
         card.stack.addArrangedSubview(permissionRow(
             title: "辅助功能",
             statusPill: accessibilityStatusPill,
@@ -247,39 +226,17 @@ private final class SettingsViewController: NSViewController {
     }
 
     private func aboutCard() -> NSView {
-        let card = SettingsCardView()
-        card.stack.addArrangedSubview(sectionHeader(title: "关于", symbolName: "info.circle"))
+        let card = SettingsCardView(title: "关于", symbolName: "info.circle")
         card.stack.addArrangedSubview(statusRow(title: "当前版本", statusPill: updateStatusPill, trailingView: checkUpdatesButton))
         card.stack.addArrangedSubview(statusRow(title: "项目主页", statusPill: nil, trailingView: githubButton))
         return card
     }
 
-    private func sectionHeader(title: String, symbolName: String) -> NSView {
-        let imageView = NSImageView()
-        imageView.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: title)
-        imageView.contentTintColor = .controlAccentColor
-        imageView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            imageView.widthAnchor.constraint(equalToConstant: 18),
-            imageView.heightAnchor.constraint(equalToConstant: 18)
-        ])
-
-        let label = NSTextField(labelWithString: title)
-        label.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
-
-        let row = NSStackView(views: [imageView, label, spacer()])
-        row.orientation = .horizontal
-        row.spacing = 7
-        row.alignment = .centerY
-        return row
-    }
-
-    private func sliderRow(title: String, slider: NSSlider, valueLabel: PillLabel) -> NSView {
-        let label = rowTitle(title)
+    private func sliderRow(title: String, slider: NSSlider, valueLabel: SettingsPill) -> NSView {
+        let label = SettingsUI.rowTitle(title)
         valueLabel.setContentHuggingPriority(.required, for: .horizontal)
 
-        let topRow = NSStackView(views: [label, spacer(), valueLabel])
+        let topRow = NSStackView(views: [label, SettingsUI.spacer(), valueLabel])
         topRow.orientation = .horizontal
         topRow.alignment = .centerY
 
@@ -287,7 +244,7 @@ private final class SettingsViewController: NSViewController {
 
         let stack = NSStackView(views: [topRow, slider])
         stack.orientation = .vertical
-        stack.spacing = 5
+        stack.spacing = 4
         return stack
     }
 
@@ -295,7 +252,7 @@ private final class SettingsViewController: NSViewController {
         statusRow(title: title, statusPill: nil, trailingView: trailingView)
     }
 
-    private func statusSwitchRow(title: String, statusPill: PillLabel, switchControl: NSSwitch) -> NSView {
+    private func statusSwitchRow(title: String, statusPill: SettingsPill, switchControl: NSSwitch) -> NSView {
         let trailing = NSStackView(views: [statusPill, switchControl])
         trailing.orientation = .horizontal
         trailing.spacing = 8
@@ -303,19 +260,32 @@ private final class SettingsViewController: NSViewController {
         return statusRow(title: title, statusPill: nil, trailingView: trailing)
     }
 
-    private func statusRow(title: String, statusPill: PillLabel?, trailingView: NSView) -> NSView {
-        let titleLabel = rowTitle(title)
-        let views = statusPill.map { [titleLabel, spacer(), $0, trailingView] } ?? [titleLabel, spacer(), trailingView]
+    private func statusSwitchActionRow(
+        title: String,
+        statusPill: SettingsPill,
+        switchControl: NSSwitch,
+        actionButton: NSButton
+    ) -> NSView {
+        let trailing = NSStackView(views: [statusPill, switchControl, actionButton])
+        trailing.orientation = .horizontal
+        trailing.spacing = 8
+        trailing.alignment = .centerY
+        return statusRow(title: title, statusPill: nil, trailingView: trailing)
+    }
+
+    private func statusRow(title: String, statusPill: SettingsPill?, trailingView: NSView) -> NSView {
+        let titleLabel = SettingsUI.rowTitle(title)
+        let views = statusPill.map { [titleLabel, SettingsUI.spacer(), $0, trailingView] } ?? [titleLabel, SettingsUI.spacer(), trailingView]
         let row = NSStackView(views: views)
         row.orientation = .horizontal
-        row.spacing = 9
+        row.spacing = SettingsUI.rowSpacing
         row.alignment = .centerY
         return row
     }
 
     private func permissionRow(
         title: String,
-        statusPill: PillLabel,
+        statusPill: SettingsPill,
         requestButton: NSButton,
         openButton: NSButton
     ) -> NSView {
@@ -331,48 +301,19 @@ private final class SettingsViewController: NSViewController {
 
     private func actionRow(primary: NSButton, secondary: NSButton? = nil) -> NSView {
         let actions = secondary.map { [primary, $0] } ?? [primary]
-        let row = NSStackView(views: [spacer()] + actions)
+        let row = NSStackView(views: [SettingsUI.spacer()] + actions)
         row.orientation = .horizontal
         row.spacing = 7
         row.alignment = .centerY
         return row
     }
 
-    private func divider() -> NSView {
-        let line = NSBox()
-        line.boxType = .separator
-        return line
-    }
-
-    private func rowTitle(_ title: String) -> NSTextField {
-        let label = NSTextField(labelWithString: title)
-        label.font = NSFont.systemFont(ofSize: 13, weight: .medium)
-        label.lineBreakMode = .byTruncatingTail
-        return label
-    }
-
-    private func spacer() -> NSView {
-        let view = NSView()
-        view.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        return view
-    }
-
     private func makeSwitch(action: Selector) -> NSSwitch {
-        let control = NSSwitch()
-        control.target = self
-        control.action = action
-        control.controlSize = .small
-        return control
+        SettingsUI.makeSwitch(target: self, action: action)
     }
 
     private func makeButton(title: String, symbolName: String, action: Selector) -> NSButton {
-        let button = NSButton(title: title, target: self, action: action)
-        button.bezelStyle = .rounded
-        button.controlSize = .small
-        button.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-        button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: title)
-        button.imagePosition = .imageLeading
-        return button
+        SettingsUI.makeButton(title: title, symbolName: symbolName, target: self, action: action)
     }
 
     private func refreshValues() {
@@ -571,148 +512,5 @@ private final class SettingsViewController: NSViewController {
         alert.messageText = "检查更新失败"
         alert.informativeText = error.localizedDescription
         alert.runModal()
-    }
-}
-
-private final class SettingsCardView: NSView {
-    let stack = NSStackView()
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-        translatesAutoresizingMaskIntoConstraints = false
-        widthAnchor.constraint(equalToConstant: 350).isActive = true
-
-        stack.orientation = .vertical
-        stack.spacing = 9
-        stack.alignment = .width
-        stack.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stack)
-
-        NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
-            stack.topAnchor.constraint(equalTo: topAnchor),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ])
-
-        updateLayerStyle()
-    }
-
-    required init?(coder: NSCoder) {
-        nil
-    }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        updateLayerStyle()
-    }
-
-    private func updateLayerStyle() {
-        layer?.cornerRadius = 13
-        layer?.cornerCurve = .continuous
-        layer?.borderWidth = 1
-        layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.58).cgColor
-        layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.55).cgColor
-    }
-}
-
-private final class PillLabel: NSView {
-    enum Tone {
-        case neutral
-        case accent
-        case success
-        case warning
-        case danger
-    }
-
-    private let label = NSTextField(labelWithString: "")
-    private var tone: Tone
-
-    init(text: String, tone: Tone) {
-        self.tone = tone
-        super.init(frame: .zero)
-        wantsLayer = true
-        translatesAutoresizingMaskIntoConstraints = false
-        setContentHuggingPriority(.required, for: .horizontal)
-        heightAnchor.constraint(equalToConstant: 22).isActive = true
-        widthAnchor.constraint(greaterThanOrEqualToConstant: 62).isActive = true
-
-        label.stringValue = text
-        label.alignment = .center
-        label.font = NSFont.systemFont(ofSize: 11, weight: .semibold)
-        label.lineBreakMode = .byTruncatingTail
-        label.usesSingleLineMode = true
-        label.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(label)
-
-        NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
-            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
-            label.centerYAnchor.constraint(equalTo: centerYAnchor)
-        ])
-
-        updateLayerStyle()
-    }
-
-    required init?(coder: NSCoder) {
-        nil
-    }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        updateLayerStyle()
-    }
-
-    func setText(_ text: String, tone: Tone) {
-        label.stringValue = text
-        self.tone = tone
-        updateLayerStyle()
-    }
-
-    private func updateLayerStyle() {
-        let colors = palette(for: tone)
-        label.textColor = colors.foreground
-        layer?.cornerRadius = 11
-        layer?.cornerCurve = .continuous
-        layer?.backgroundColor = colors.background.cgColor
-        layer?.borderWidth = 1
-        layer?.borderColor = colors.border.cgColor
-    }
-
-    private func palette(for tone: Tone) -> (foreground: NSColor, background: NSColor, border: NSColor) {
-        switch tone {
-        case .neutral:
-            return (
-                .secondaryLabelColor,
-                NSColor.secondaryLabelColor.withAlphaComponent(0.10),
-                NSColor.separatorColor.withAlphaComponent(0.45)
-            )
-        case .accent:
-            return (
-                .controlAccentColor,
-                NSColor.controlAccentColor.withAlphaComponent(0.15),
-                NSColor.controlAccentColor.withAlphaComponent(0.35)
-            )
-        case .success:
-            return (
-                .systemGreen,
-                NSColor.systemGreen.withAlphaComponent(0.16),
-                NSColor.systemGreen.withAlphaComponent(0.34)
-            )
-        case .warning:
-            return (
-                .systemOrange,
-                NSColor.systemOrange.withAlphaComponent(0.15),
-                NSColor.systemOrange.withAlphaComponent(0.33)
-            )
-        case .danger:
-            return (
-                .systemRed,
-                NSColor.systemRed.withAlphaComponent(0.15),
-                NSColor.systemRed.withAlphaComponent(0.33)
-            )
-        }
     }
 }

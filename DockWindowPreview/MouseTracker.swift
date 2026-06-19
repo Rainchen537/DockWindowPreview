@@ -59,14 +59,14 @@ final class MouseTracker {
             return
         }
 
-        let now = Date.timeIntervalSinceReferenceDate
-        guard now - lastHandledAt >= throttleInterval else { return }
-        lastHandledAt = now
-
         if isPointInsidePreviewPanel?(point) == true {
             cancelPendingLeave()
             return
         }
+
+        let now = Date.timeIntervalSinceReferenceDate
+        guard now - lastHandledAt >= throttleInterval else { return }
+        lastHandledAt = now
 
         guard let region = dockInspector.dockRegion(containing: point), region.frame.insetBy(dx: -6, dy: -6).contains(point) else {
             currentHoverIdentity = nil

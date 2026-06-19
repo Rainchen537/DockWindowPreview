@@ -3,16 +3,15 @@ import AppKit
 final class FocusOverlayController {
     private var panel: FocusOverlayPanel?
 
-    func show(image: NSImage, aspectRatio: CGFloat, preferredScreenFrame: NSRect?) {
+    func show(image: NSImage, windowBounds: CGRect) {
         let overlayFrame = Self.allScreensFrame()
-        let screenFrame = preferredScreenFrame ?? NSScreen.main?.frame ?? overlayFrame
 
         if panel == nil {
             panel = FocusOverlayPanel(frame: overlayFrame)
         }
 
         panel?.setFrame(overlayFrame, display: false)
-        panel?.configure(image: image, aspectRatio: aspectRatio, screenFrame: screenFrame)
+        panel?.configure(image: image, windowBounds: windowBounds)
         panel?.orderFrontRegardless()
     }
 
@@ -58,11 +57,10 @@ private final class FocusOverlayPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
-    func configure(image: NSImage, aspectRatio: CGFloat, screenFrame: NSRect) {
+    func configure(image: NSImage, windowBounds: CGRect) {
         overlayView.configure(
             image: image,
-            aspectRatio: aspectRatio,
-            screenFrame: screenFrame,
+            windowBounds: windowBounds,
             overlayFrame: frame
         )
     }
@@ -74,28 +72,22 @@ private final class FocusOverlayView: NSView {
 
     override var isFlipped: Bool { false }
 
-    func configure(image: NSImage, aspectRatio: CGFloat, screenFrame: NSRect, overlayFrame: NSRect) {
+    func configure(image: NSImage, windowBounds: CGRect, overlayFrame: NSRect) {
         self.image = image
-
-        let localScreenFrame = screenFrame.offsetBy(dx: -overlayFrame.minX, dy: -overlayFrame.minY)
-        let horizontalInset = min(max(48, localScreenFrame.width * 0.12), localScreenFrame.width * 0.20)
-        let verticalInset = min(max(48, localScreenFrame.height * 0.12), localScreenFrame.height * 0.20)
-        let availableRect = localScreenFrame.insetBy(dx: horizontalInset, dy: verticalInset)
-
-        focusRect = Self.aspectFitRect(aspectRatio: aspectRatio, in: availableRect)
+        focusRect = Self.windowRect(for: windowBounds, overlayFrame: overlayFrame)
         needsDisplay = true
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        NSColor(calibratedWhite: 0.015, alpha: 0.76).setFill()
+        NSColor(calibratedWhite: 0.015, alpha: 0.34).setFill()
         bounds.fill()
 
         guard let image, !focusRect.isEmpty else { return }
 
         let shadow = NSShadow()
-        shadow.shadowBlurRadius = 28
-        shadow.shadowOffset = NSSize(width: 0, height: -10)
-        shadow.shadowColor = NSColor(calibratedWhite: 0, alpha: 0.45)
+        shadow.shadowBlurRadius = 18
+        shadow.shadowOffset = NSSize(width: 0, height: -6)
+        shadow.shadowColor = NSColor(calibratedWhite: 0, alpha: 0.30)
 
         let roundedRect = NSBezierPath(roundedRect: focusRect, xRadius: 12, yRadius: 12)
 
@@ -117,21 +109,15 @@ private final class FocusOverlayView: NSView {
         border.stroke()
     }
 
-    private static func aspectFitRect(aspectRatio: CGFloat, in rect: NSRect) -> NSRect {
-        let ratio = max(0.2, min(aspectRatio, 5))
-        var width = rect.width
-        var height = width / ratio
-
-        if height > rect.height {
-            height = rect.height
-            width = height * ratio
-        }
-
+    private static func windowRect(for windowBounds: CGRect, overlayFrame: NSRect) -> NSRect {
+        // CGWindow/AX bounds are reported in global display coordinates. AppKit
+        // draws this non-flipped overlay from the bottom-left, so flip the Y axis
+        // over the all-screens frame and preserve the window's original size.
         return NSRect(
-            x: rect.midX - width / 2,
-            y: rect.midY - height / 2,
-            width: width,
-            height: height
+            x: windowBounds.minX - overlayFrame.minX,
+            y: overlayFrame.maxY - windowBounds.maxY,
+            width: windowBounds.width,
+            height: windowBounds.height
         )
     }
 }

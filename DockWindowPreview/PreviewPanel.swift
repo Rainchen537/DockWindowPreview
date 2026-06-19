@@ -18,6 +18,7 @@ private enum PreviewPanelLayout {
     static let controlTop: CGFloat = 7
     static let controlMaskWidth: CGFloat = 78
     static let controlMaskHeight: CGFloat = 27
+    static let dockBridgeInset: CGFloat = 18
     static let focusPreviewDelay: TimeInterval = 0.05
 }
 
@@ -120,7 +121,17 @@ final class PreviewPanel: NSPanel {
     }
 
     func containsScreenPoint(_ point: NSPoint) -> Bool {
-        frame.insetBy(dx: -10, dy: -10).contains(point)
+        guard isVisible else { return false }
+
+        if frame.insetBy(dx: -10, dy: -10).contains(point) {
+            return true
+        }
+
+        guard let anchor = currentAnchor, let dockEdge = currentDockEdge else {
+            return false
+        }
+
+        return bridgeFrame(from: anchor, dockEdge: dockEdge).contains(point)
     }
 
     private func setupContent() {
@@ -276,34 +287,18 @@ final class PreviewPanel: NSPanel {
     }
 
     private func showFocusOverlay(for window: WindowInfo) {
-        let aspectRatio = max(0.2, window.bounds.width / max(window.bounds.height, 1))
-        let screen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
-        let screenFrame = screen?.frame
-        let availableFrame = screen?.visibleFrame ?? screen?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let targetSize = focusImageSize(aspectRatio: aspectRatio, in: availableFrame)
+        let targetSize = NSSize(
+            width: max(80, window.bounds.width),
+            height: max(60, window.bounds.height)
+        )
 
         guard let image = thumbnailProvider.focusImage(for: window, targetSize: targetSize) else {
             focusOverlay.hide()
             return
         }
 
-        focusOverlay.show(image: image, aspectRatio: aspectRatio, preferredScreenFrame: screenFrame)
+        focusOverlay.show(image: image, windowBounds: window.bounds)
         orderFrontRegardless()
-    }
-
-    private func focusImageSize(aspectRatio: CGFloat, in rect: NSRect) -> NSSize {
-        let ratio = max(0.2, min(aspectRatio, 5))
-        let maxWidth = rect.width * 0.76
-        let maxHeight = rect.height * 0.70
-        var width = maxWidth
-        var height = width / ratio
-
-        if height > maxHeight {
-            height = maxHeight
-            width = height * ratio
-        }
-
-        return NSSize(width: max(80, width), height: max(60, height))
     }
 
     private func positionedFrame(size: NSSize, anchor: NSPoint, dockEdge: DockEdge?) -> NSRect {
@@ -317,13 +312,13 @@ final class PreviewPanel: NSPanel {
         case .bottom:
             // The Dock owns its tooltip window and public APIs cannot suppress it.
             // Keep our preview lifted so the tooltip does not visually collide.
-            let y = visibleFrame.minY > screenFrame.minY + 20 ? visibleFrame.minY + 30 : screenFrame.minY + 126
+            let y = visibleFrame.minY > screenFrame.minY + 20 ? visibleFrame.minY + 42 : screenFrame.minY + 144
             origin = NSPoint(x: anchor.x - size.width / 2, y: y)
         case .left:
-            let x = visibleFrame.minX > screenFrame.minX + 20 ? visibleFrame.minX + 22 : screenFrame.minX + 108
+            let x = visibleFrame.minX > screenFrame.minX + 20 ? visibleFrame.minX + 30 : screenFrame.minX + 124
             origin = NSPoint(x: x, y: anchor.y - size.height / 2)
         case .right:
-            let x = visibleFrame.maxX < screenFrame.maxX - 20 ? visibleFrame.maxX - size.width - 22 : screenFrame.maxX - size.width - 108
+            let x = visibleFrame.maxX < screenFrame.maxX - 20 ? visibleFrame.maxX - size.width - 30 : screenFrame.maxX - size.width - 124
             origin = NSPoint(x: x, y: anchor.y - size.height / 2)
         case nil:
             origin = NSPoint(x: anchor.x - size.width / 2, y: anchor.y + 24)
@@ -333,6 +328,40 @@ final class PreviewPanel: NSPanel {
         origin.y = min(max(origin.y, visibleFrame.minY + padding), visibleFrame.maxY - size.height - padding)
 
         return NSRect(origin: origin, size: size)
+    }
+
+    private func bridgeFrame(from anchor: NSPoint, dockEdge: DockEdge) -> NSRect {
+        let inset = PreviewPanelLayout.dockBridgeInset
+
+        switch dockEdge {
+        case .bottom:
+            let minY = min(anchor.y, frame.minY) - inset
+            let maxY = max(anchor.y, frame.minY) + inset
+            return NSRect(
+                x: frame.minX - inset,
+                y: minY,
+                width: frame.width + inset * 2,
+                height: max(1, maxY - minY)
+            )
+        case .left:
+            let minX = min(anchor.x, frame.minX) - inset
+            let maxX = max(anchor.x, frame.minX) + inset
+            return NSRect(
+                x: minX,
+                y: frame.minY - inset,
+                width: max(1, maxX - minX),
+                height: frame.height + inset * 2
+            )
+        case .right:
+            let minX = min(anchor.x, frame.maxX) - inset
+            let maxX = max(anchor.x, frame.maxX) + inset
+            return NSRect(
+                x: minX,
+                y: frame.minY - inset,
+                width: max(1, maxX - minX),
+                height: frame.height + inset * 2
+            )
+        }
     }
 }
 
@@ -668,12 +697,13 @@ private final class PreviewTitleMaskView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        let leftColor = NSColor(calibratedWhite: 0.06, alpha: 0.92).cgColor
-        let rightColor = NSColor(calibratedWhite: 0.06, alpha: 0).cgColor
+        let leftColor = NSColor(calibratedWhite: 1, alpha: 0.30).cgColor
+        let midColor = NSColor(calibratedWhite: 1, alpha: 0.18).cgColor
+        let rightColor = NSColor(calibratedWhite: 1, alpha: 0).cgColor
         guard let gradient = CGGradient(
             colorsSpace: CGColorSpaceCreateDeviceRGB(),
-            colors: [leftColor, leftColor, rightColor] as CFArray,
-            locations: [0, 0.68, 1]
+            colors: [leftColor, midColor, rightColor] as CFArray,
+            locations: [0, 0.66, 1]
         ) else { return }
 
         let context = NSGraphicsContext.current?.cgContext

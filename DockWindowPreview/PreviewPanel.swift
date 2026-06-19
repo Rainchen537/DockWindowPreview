@@ -2,6 +2,25 @@ import AppKit
 import Foundation
 import QuartzCore
 
+private enum PreviewPanelLayout {
+    static let panelInset: CGFloat = 5
+    static let rowSpacing: CGFloat = 5
+    static let cardSpacing: CGFloat = 5
+    static let cardInset: CGFloat = 4
+    static let titleImageSpacing: CGFloat = 3
+    static let titleRowHeight: CGFloat = 18
+    static let titleBandHeight: CGFloat = titleRowHeight + titleImageSpacing
+    static let titleFontSize: CGFloat = 11.7
+    static let titleIconSize: CGFloat = 17
+    static let controlButtonSize: CGFloat = 14.5
+    static let controlSpacing: CGFloat = 6
+    static let controlLeading: CGFloat = 7
+    static let controlTop: CGFloat = 7
+    static let controlMaskWidth: CGFloat = 78
+    static let controlMaskHeight: CGFloat = 27
+    static let focusPreviewDelay: TimeInterval = 0.05
+}
+
 final class PreviewPanel: NSPanel {
     var onSelectWindow: ((WindowInfo) -> Void)?
     var onCloseWindow: ((WindowInfo) -> Void)?
@@ -114,8 +133,13 @@ final class PreviewPanel: NSPanel {
         contentView = rootView
 
         stackView.orientation = .vertical
-        stackView.spacing = 6
-        stackView.edgeInsets = NSEdgeInsets(top: 6, left: 6, bottom: 6, right: 6)
+        stackView.spacing = PreviewPanelLayout.rowSpacing
+        stackView.edgeInsets = NSEdgeInsets(
+            top: PreviewPanelLayout.panelInset,
+            left: PreviewPanelLayout.panelInset,
+            bottom: PreviewPanelLayout.panelInset,
+            right: PreviewPanelLayout.panelInset
+        )
         stackView.translatesAutoresizingMaskIntoConstraints = false
         rootView.addSubview(stackView)
 
@@ -147,16 +171,22 @@ final class PreviewPanel: NSPanel {
         }
     }
 
-    private func makeRows(for items: [PreviewItem], appIcon: NSImage?) -> [NSStackView] {
+    private func makeRows(for items: [PreviewItem], appIcon: NSImage?) -> [WindowPreviewRowView] {
         let groups = rowGroups(for: items)
-        var rows: [NSStackView] = []
+        var rows: [WindowPreviewRowView] = []
 
         for group in groups {
-            let row = NSStackView()
+            let row = WindowPreviewRowView()
             row.orientation = .horizontal
-            row.spacing = 6
+            row.spacing = PreviewPanelLayout.cardSpacing
             row.alignment = .top
             row.distribution = .fill
+            row.onFocusPreview = { [weak self] selectedWindow in
+                self?.showFocusOverlay(for: selectedWindow)
+            }
+            row.onFocusPreviewEnded = { [weak self] in
+                self?.focusOverlay.hide()
+            }
 
             for item in group {
                 let card = WindowPreviewCardView(
@@ -178,12 +208,6 @@ final class PreviewPanel: NSPanel {
                 card.onQuitApplication = { [weak self] selectedWindow in
                     self?.onQuitApplication?(selectedWindow)
                 }
-                card.onFocusPreview = { [weak self] selectedWindow in
-                    self?.showFocusOverlay(for: selectedWindow)
-                }
-                card.onFocusPreviewEnded = { [weak self] in
-                    self?.focusOverlay.hide()
-                }
                 row.addArrangedSubview(card)
             }
 
@@ -196,7 +220,7 @@ final class PreviewPanel: NSPanel {
     private func rowGroups(for items: [PreviewItem]) -> [[PreviewItem]] {
         let availableWidth = (NSScreen.main?.visibleFrame.width ?? 1440) - 32
         let maxContentWidth = max(280, availableWidth - 16)
-        let spacing: CGFloat = 6
+        let spacing = PreviewPanelLayout.cardSpacing
         var groups: [[PreviewItem]] = []
         var currentGroup: [PreviewItem] = []
         var currentWidth: CGFloat = 0
@@ -223,15 +247,15 @@ final class PreviewPanel: NSPanel {
 
     private func preferredPanelSize(for items: [PreviewItem]) -> NSSize {
         let groups = rowGroups(for: items)
-        let spacing: CGFloat = 6
+        let spacing = PreviewPanelLayout.rowSpacing
         let rowWidths = groups.map { group in
-            group.reduce(CGFloat(0)) { $0 + cardSize(for: $1).width } + CGFloat(max(group.count - 1, 0)) * spacing
+            group.reduce(CGFloat(0)) { $0 + cardSize(for: $1).width } + CGFloat(max(group.count - 1, 0)) * PreviewPanelLayout.cardSpacing
         }
         let rowHeights = groups.map { group in
             group.map { cardSize(for: $0).height }.max() ?? 0
         }
-        let width = (rowWidths.max() ?? 0) + 12
-        let height = rowHeights.reduce(CGFloat(0), +) + CGFloat(max(groups.count - 1, 0)) * spacing + 12
+        let width = (rowWidths.max() ?? 0) + PreviewPanelLayout.panelInset * 2
+        let height = rowHeights.reduce(CGFloat(0), +) + CGFloat(max(groups.count - 1, 0)) * spacing + PreviewPanelLayout.panelInset * 2
 
         guard let screen = NSScreen.main else {
             return NSSize(width: width, height: height)
@@ -244,8 +268,11 @@ final class PreviewPanel: NSPanel {
     }
 
     private func cardSize(for item: PreviewItem) -> NSSize {
-        let titleHeight: CGFloat = settings.showWindowTitles ? 27 : 0
-        return NSSize(width: item.thumbnailSize.width + 12, height: item.thumbnailSize.height + titleHeight + 12)
+        let titleHeight: CGFloat = settings.showWindowTitles ? PreviewPanelLayout.titleBandHeight : 0
+        return NSSize(
+            width: item.thumbnailSize.width + PreviewPanelLayout.cardInset * 2,
+            height: item.thumbnailSize.height + titleHeight + PreviewPanelLayout.cardInset * 2
+        )
     }
 
     private func showFocusOverlay(for window: WindowInfo) {
@@ -288,13 +315,15 @@ final class PreviewPanel: NSPanel {
         var origin: NSPoint
         switch dockEdge {
         case .bottom:
-            let y = visibleFrame.minY > screenFrame.minY + 20 ? visibleFrame.minY + padding : screenFrame.minY + 92
+            // The Dock owns its tooltip window and public APIs cannot suppress it.
+            // Keep our preview lifted so the tooltip does not visually collide.
+            let y = visibleFrame.minY > screenFrame.minY + 20 ? visibleFrame.minY + 30 : screenFrame.minY + 126
             origin = NSPoint(x: anchor.x - size.width / 2, y: y)
         case .left:
-            let x = visibleFrame.minX > screenFrame.minX + 20 ? visibleFrame.minX + padding : screenFrame.minX + 92
+            let x = visibleFrame.minX > screenFrame.minX + 20 ? visibleFrame.minX + 22 : screenFrame.minX + 108
             origin = NSPoint(x: x, y: anchor.y - size.height / 2)
         case .right:
-            let x = visibleFrame.maxX < screenFrame.maxX - 20 ? visibleFrame.maxX - size.width - padding : screenFrame.maxX - size.width - 92
+            let x = visibleFrame.maxX < screenFrame.maxX - 20 ? visibleFrame.maxX - size.width - 22 : screenFrame.maxX - size.width - 108
             origin = NSPoint(x: x, y: anchor.y - size.height / 2)
         case nil:
             origin = NSPoint(x: anchor.x - size.width / 2, y: anchor.y + 24)
@@ -304,6 +333,124 @@ final class PreviewPanel: NSPanel {
         origin.y = min(max(origin.y, visibleFrame.minY + padding), visibleFrame.maxY - size.height - padding)
 
         return NSRect(origin: origin, size: size)
+    }
+}
+
+private final class WindowPreviewRowView: NSStackView {
+    var onFocusPreview: ((WindowInfo) -> Void)?
+    var onFocusPreviewEnded: (() -> Void)?
+
+    private var focusPreviewWorkItem: DispatchWorkItem?
+    private var scheduledWindowID: CGWindowID?
+    private var activeWindowID: CGWindowID?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(
+            rect: bounds,
+            options: [.activeAlways, .mouseEnteredAndExited, .mouseMoved, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        ))
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        updateFocusPreview(at: convert(event.locationInWindow, from: nil))
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        updateFocusPreview(at: convert(event.locationInWindow, from: nil))
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        cancelFocusPreview(notifyEnd: true)
+    }
+
+    private func updateFocusPreview(at point: NSPoint) {
+        guard let card = focusCard(at: point) else {
+            cancelFocusPreview(notifyEnd: true)
+            return
+        }
+
+        let windowID = card.previewWindow.windowID
+        if activeWindowID == windowID {
+            focusPreviewWorkItem?.cancel()
+            focusPreviewWorkItem = nil
+            scheduledWindowID = nil
+            return
+        }
+
+        guard scheduledWindowID != windowID else { return }
+
+        focusPreviewWorkItem?.cancel()
+        scheduledWindowID = windowID
+
+        let workItem = DispatchWorkItem { [weak self, weak card] in
+            guard let self, let card else { return }
+            self.activeWindowID = card.previewWindow.windowID
+            self.scheduledWindowID = nil
+            self.onFocusPreview?(card.previewWindow)
+        }
+        focusPreviewWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + PreviewPanelLayout.focusPreviewDelay, execute: workItem)
+    }
+
+    private func cancelFocusPreview(notifyEnd: Bool) {
+        focusPreviewWorkItem?.cancel()
+        focusPreviewWorkItem = nil
+        scheduledWindowID = nil
+        activeWindowID = nil
+
+        if notifyEnd {
+            onFocusPreviewEnded?()
+        }
+    }
+
+    private func focusCard(at point: NSPoint) -> WindowPreviewCardView? {
+        let cards = arrangedSubviews.compactMap { $0 as? WindowPreviewCardView }
+        guard !cards.isEmpty else { return nil }
+
+        let rects = cards.map { card in
+            (card: card, rect: card.previewImageRect(in: self))
+        }
+
+        let imageBand = rects.reduce(NSRect.null) { partialResult, item in
+            partialResult.union(NSRect(
+                x: item.rect.minX,
+                y: item.rect.minY,
+                width: item.rect.width,
+                height: item.rect.height
+            ))
+        }
+
+        guard imageBand.contains(point) else { return nil }
+
+        for index in rects.indices {
+            let current = rects[index]
+            let minX: CGFloat
+            let maxX: CGFloat
+
+            if index == rects.startIndex {
+                minX = current.rect.minX
+            } else {
+                let previous = rects[rects.index(before: index)].rect
+                minX = (previous.maxX + current.rect.minX) / 2
+            }
+
+            if index == rects.index(before: rects.endIndex) {
+                maxX = current.rect.maxX
+            } else {
+                let next = rects[rects.index(after: index)].rect
+                maxX = (current.rect.maxX + next.minX) / 2
+            }
+
+            if point.x >= minX, point.x <= maxX {
+                return current.card
+            }
+        }
+
+        return nil
     }
 }
 
@@ -325,20 +472,18 @@ private final class WindowPreviewCardView: NSView {
     var onClose: ((WindowInfo) -> Void)?
     var onMinimize: ((WindowInfo) -> Void)?
     var onQuitApplication: ((WindowInfo) -> Void)?
-    var onFocusPreview: ((WindowInfo) -> Void)?
-    var onFocusPreviewEnded: (() -> Void)?
 
     private let windowInfo: WindowInfo
     private let iconView = NSImageView()
     private let imageView = NSImageView()
     private let titleLabel = NSTextField(labelWithString: "")
+    private let controlMaskView = PreviewTitleMaskView()
     private let controlStack = NSStackView()
     private lazy var quitButton = PreviewControlButton(kind: .quitApp, target: self, action: #selector(quitApplicationButtonClicked))
     private lazy var closeButton = PreviewControlButton(kind: .closeWindow, target: self, action: #selector(closeButtonClicked))
     private lazy var minimizeButton = PreviewControlButton(kind: .minimizeWindow, target: self, action: #selector(minimizeButtonClicked))
     private let thumbnailSize: NSSize
     private let settings: AppSettings
-    private var focusPreviewWorkItem: DispatchWorkItem?
 
     init(window: WindowInfo, appIcon: NSImage?, thumbnail: NSImage, thumbnailSize: NSSize, settings: AppSettings) {
         self.windowInfo = window
@@ -360,8 +505,19 @@ private final class WindowPreviewCardView: NSView {
     }
 
     override var intrinsicContentSize: NSSize {
-        let titleHeight: CGFloat = settings.showWindowTitles ? 27 : 0
-        return NSSize(width: thumbnailSize.width + 12, height: thumbnailSize.height + titleHeight + 12)
+        let titleHeight: CGFloat = settings.showWindowTitles ? PreviewPanelLayout.titleBandHeight : 0
+        return NSSize(
+            width: thumbnailSize.width + PreviewPanelLayout.cardInset * 2,
+            height: thumbnailSize.height + titleHeight + PreviewPanelLayout.cardInset * 2
+        )
+    }
+
+    var previewWindow: WindowInfo {
+        windowInfo
+    }
+
+    func previewImageRect(in view: NSView) -> NSRect {
+        imageView.convert(imageView.bounds, to: view)
     }
 
     override func updateTrackingAreas() {
@@ -379,18 +535,15 @@ private final class WindowPreviewCardView: NSView {
         layer?.backgroundColor = NSColor(calibratedRed: 0.25, green: 0.47, blue: 0.95, alpha: 0.26).cgColor
         layer?.borderColor = NSColor(calibratedRed: 0.45, green: 0.65, blue: 1, alpha: 0.70).cgColor
         setControlButtonsVisible(true)
-        scheduleFocusPreview()
     }
 
     override func mouseExited(with event: NSEvent) {
         layer?.backgroundColor = NSColor(calibratedWhite: 1, alpha: 0.06).cgColor
         layer?.borderColor = NSColor(calibratedWhite: 1, alpha: 0.10).cgColor
         setControlButtonsVisible(false)
-        cancelFocusPreview(notifyEnd: true)
     }
 
     override func mouseDown(with event: NSEvent) {
-        cancelFocusPreview(notifyEnd: true)
         onClick?(windowInfo)
     }
 
@@ -402,42 +555,21 @@ private final class WindowPreviewCardView: NSView {
             context.duration = 0.07
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             controlStack.animator().alphaValue = visible ? 1 : 0
-        }
-    }
-
-    private func scheduleFocusPreview() {
-        focusPreviewWorkItem?.cancel()
-
-        let workItem = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            self.onFocusPreview?(self.windowInfo)
-        }
-        focusPreviewWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: workItem)
-    }
-
-    private func cancelFocusPreview(notifyEnd: Bool) {
-        focusPreviewWorkItem?.cancel()
-        focusPreviewWorkItem = nil
-        if notifyEnd {
-            onFocusPreviewEnded?()
+            controlMaskView.animator().alphaValue = visible ? 1 : 0
         }
     }
 
     @objc private func quitApplicationButtonClicked() {
-        cancelFocusPreview(notifyEnd: true)
         setControlButtonsVisible(false)
         onQuitApplication?(windowInfo)
     }
 
     @objc private func closeButtonClicked() {
-        cancelFocusPreview(notifyEnd: true)
         setControlButtonsVisible(false)
         onClose?(windowInfo)
     }
 
     @objc private func minimizeButtonClicked() {
-        cancelFocusPreview(notifyEnd: true)
         setControlButtonsVisible(false)
         onMinimize?(windowInfo)
     }
@@ -445,8 +577,13 @@ private final class WindowPreviewCardView: NSView {
     private func setupViews(appIcon: NSImage?, thumbnail: NSImage) {
         let contentStack = NSStackView()
         contentStack.orientation = .vertical
-        contentStack.spacing = 5
-        contentStack.edgeInsets = NSEdgeInsets(top: 6, left: 6, bottom: 6, right: 6)
+        contentStack.spacing = PreviewPanelLayout.titleImageSpacing
+        contentStack.edgeInsets = NSEdgeInsets(
+            top: PreviewPanelLayout.cardInset,
+            left: PreviewPanelLayout.cardInset,
+            bottom: PreviewPanelLayout.cardInset,
+            right: PreviewPanelLayout.cardInset
+        )
         contentStack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(contentStack)
 
@@ -460,19 +597,20 @@ private final class WindowPreviewCardView: NSView {
         if settings.showWindowTitles {
             let titleRow = NSStackView()
             titleRow.orientation = .horizontal
-            titleRow.spacing = 6
+            titleRow.spacing = 5
             titleRow.alignment = .centerY
             titleRow.distribution = .fill
             titleRow.widthAnchor.constraint(equalToConstant: thumbnailSize.width).isActive = true
+            titleRow.heightAnchor.constraint(equalToConstant: PreviewPanelLayout.titleRowHeight).isActive = true
 
             iconView.image = appIcon
             iconView.imageScaling = .scaleProportionallyUpOrDown
             iconView.setContentHuggingPriority(.required, for: .horizontal)
-            iconView.widthAnchor.constraint(equalToConstant: 18).isActive = true
-            iconView.heightAnchor.constraint(equalToConstant: 18).isActive = true
+            iconView.widthAnchor.constraint(equalToConstant: PreviewPanelLayout.titleIconSize).isActive = true
+            iconView.heightAnchor.constraint(equalToConstant: PreviewPanelLayout.titleIconSize).isActive = true
 
             titleLabel.stringValue = windowInfo.title
-            titleLabel.font = NSFont.systemFont(ofSize: 11.7, weight: .semibold)
+            titleLabel.font = NSFont.systemFont(ofSize: PreviewPanelLayout.titleFontSize, weight: .semibold)
             titleLabel.textColor = NSColor(calibratedWhite: 0.94, alpha: 1)
             titleLabel.lineBreakMode = .byTruncatingTail
             titleLabel.maximumNumberOfLines = 1
@@ -495,8 +633,12 @@ private final class WindowPreviewCardView: NSView {
         imageView.heightAnchor.constraint(equalToConstant: thumbnailSize.height).isActive = true
         contentStack.addArrangedSubview(imageView)
 
+        controlMaskView.alphaValue = 0
+        controlMaskView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(controlMaskView)
+
         controlStack.orientation = .horizontal
-        controlStack.spacing = 7
+        controlStack.spacing = PreviewPanelLayout.controlSpacing
         controlStack.alignment = .centerY
         controlStack.alphaValue = 0
         controlStack.translatesAutoresizingMaskIntoConstraints = false
@@ -506,10 +648,45 @@ private final class WindowPreviewCardView: NSView {
         addSubview(controlStack)
 
         NSLayoutConstraint.activate([
-            controlStack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
-            controlStack.topAnchor.constraint(equalTo: topAnchor, constant: 10)
+            controlMaskView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 2),
+            controlMaskView.topAnchor.constraint(equalTo: topAnchor, constant: 2),
+            controlMaskView.widthAnchor.constraint(equalToConstant: PreviewPanelLayout.controlMaskWidth),
+            controlMaskView.heightAnchor.constraint(equalToConstant: PreviewPanelLayout.controlMaskHeight),
+
+            controlStack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: PreviewPanelLayout.controlLeading),
+            controlStack.topAnchor.constraint(equalTo: topAnchor, constant: PreviewPanelLayout.controlTop)
         ])
         setControlButtonsVisible(false)
+    }
+}
+
+private final class PreviewTitleMaskView: NSView {
+    override var isOpaque: Bool { false }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let leftColor = NSColor(calibratedWhite: 0.06, alpha: 0.92).cgColor
+        let rightColor = NSColor(calibratedWhite: 0.06, alpha: 0).cgColor
+        guard let gradient = CGGradient(
+            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: [leftColor, leftColor, rightColor] as CFArray,
+            locations: [0, 0.68, 1]
+        ) else { return }
+
+        let context = NSGraphicsContext.current?.cgContext
+        context?.saveGState()
+        context?.addPath(CGPath(roundedRect: bounds, cornerWidth: 8, cornerHeight: 8, transform: nil))
+        context?.clip()
+        context?.drawLinearGradient(
+            gradient,
+            start: CGPoint(x: bounds.minX, y: bounds.midY),
+            end: CGPoint(x: bounds.maxX, y: bounds.midY),
+            options: []
+        )
+        context?.restoreGState()
     }
 }
 
@@ -521,10 +698,12 @@ private final class PreviewControlButton: NSButton {
     }
 
     private let kind: Kind
+    private var isHovered = false
 
     init(kind: Kind, target: AnyObject?, action: Selector) {
         self.kind = kind
-        super.init(frame: NSRect(x: 0, y: 0, width: 12, height: 12))
+        let size = PreviewPanelLayout.controlButtonSize
+        super.init(frame: NSRect(x: 0, y: 0, width: size, height: size))
         self.target = target
         self.action = action
         title = ""
@@ -533,8 +712,8 @@ private final class PreviewControlButton: NSButton {
         wantsLayer = true
         toolTip = kind.toolTip
         translatesAutoresizingMaskIntoConstraints = false
-        widthAnchor.constraint(equalToConstant: 12).isActive = true
-        heightAnchor.constraint(equalToConstant: 12).isActive = true
+        widthAnchor.constraint(equalToConstant: size).isActive = true
+        heightAnchor.constraint(equalToConstant: size).isActive = true
     }
 
     required init?(coder: NSCoder) {
@@ -542,20 +721,66 @@ private final class PreviewControlButton: NSButton {
     }
 
     override var intrinsicContentSize: NSSize {
-        NSSize(width: 12, height: 12)
+        NSSize(width: PreviewPanelLayout.controlButtonSize, height: PreviewPanelLayout.controlButtonSize)
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
         true
     }
 
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(
+            rect: bounds,
+            options: [.activeAlways, .mouseEnteredAndExited, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        ))
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        isHovered = true
+        needsDisplay = true
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        isHovered = false
+        needsDisplay = true
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        needsDisplay = true
+        super.mouseDown(with: event)
+        needsDisplay = true
+    }
+
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: .pointingHand)
+    }
+
     override func draw(_ dirtyRect: NSRect) {
-        let circleRect = bounds.insetBy(dx: 0.25, dy: 0.25)
-        NSColor(calibratedWhite: 0, alpha: isHighlighted ? 0.18 : 0.10).setFill()
-        NSBezierPath(ovalIn: circleRect.offsetBy(dx: 0, dy: -0.5)).fill()
+        let circleRect = bounds.insetBy(dx: 0.35, dy: 0.35)
+        NSColor(calibratedWhite: 0, alpha: isHighlighted ? 0.26 : 0.14).setFill()
+        NSBezierPath(ovalIn: circleRect.offsetBy(dx: 0, dy: -0.6)).fill()
 
         kind.fillColor.setFill()
         NSBezierPath(ovalIn: circleRect).fill()
+
+        if isHovered {
+            NSColor.white.withAlphaComponent(0.18).setFill()
+            NSBezierPath(ovalIn: circleRect).fill()
+
+            NSColor.white.withAlphaComponent(0.45).setStroke()
+            let ring = NSBezierPath(ovalIn: circleRect.insetBy(dx: 0.55, dy: 0.55))
+            ring.lineWidth = 1
+            ring.stroke()
+        }
+
+        if isHighlighted {
+            NSColor.black.withAlphaComponent(0.12).setFill()
+            NSBezierPath(ovalIn: circleRect).fill()
+        }
 
         switch kind {
         case .quitApp:
@@ -570,17 +795,17 @@ private final class PreviewControlButton: NSButton {
     private func drawPowerSymbol(in rect: NSRect) {
         NSColor.white.withAlphaComponent(0.86).setStroke()
 
-        let center = NSPoint(x: rect.midX, y: rect.midY - 0.35)
+        let center = NSPoint(x: rect.midX, y: rect.midY - rect.height * 0.035)
         let arc = NSBezierPath()
-        arc.appendArc(withCenter: center, radius: 3.15, startAngle: 130, endAngle: 410)
-        arc.lineWidth = 1.05
+        arc.appendArc(withCenter: center, radius: rect.width * 0.27, startAngle: 130, endAngle: 410)
+        arc.lineWidth = max(1.1, rect.width * 0.085)
         arc.lineCapStyle = .round
         arc.stroke()
 
         let line = NSBezierPath()
-        line.move(to: NSPoint(x: rect.midX, y: rect.midY + 1.0))
-        line.line(to: NSPoint(x: rect.midX, y: rect.midY + 4.0))
-        line.lineWidth = 1.1
+        line.move(to: NSPoint(x: rect.midX, y: rect.midY + rect.height * 0.08))
+        line.line(to: NSPoint(x: rect.midX, y: rect.maxY - rect.height * 0.22))
+        line.lineWidth = max(1.1, rect.width * 0.09)
         line.lineCapStyle = .round
         line.stroke()
     }
@@ -589,12 +814,13 @@ private final class PreviewControlButton: NSButton {
         NSColor(calibratedWhite: 0.16, alpha: 0.72).setStroke()
 
         let path = NSBezierPath()
-        path.lineWidth = 1.1
+        let inset = rect.width * 0.32
+        path.lineWidth = max(1.1, rect.width * 0.085)
         path.lineCapStyle = .round
-        path.move(to: NSPoint(x: rect.minX + 3.65, y: rect.minY + 3.65))
-        path.line(to: NSPoint(x: rect.maxX - 3.65, y: rect.maxY - 3.65))
-        path.move(to: NSPoint(x: rect.maxX - 3.65, y: rect.minY + 3.65))
-        path.line(to: NSPoint(x: rect.minX + 3.65, y: rect.maxY - 3.65))
+        path.move(to: NSPoint(x: rect.minX + inset, y: rect.minY + inset))
+        path.line(to: NSPoint(x: rect.maxX - inset, y: rect.maxY - inset))
+        path.move(to: NSPoint(x: rect.maxX - inset, y: rect.minY + inset))
+        path.line(to: NSPoint(x: rect.minX + inset, y: rect.maxY - inset))
         path.stroke()
     }
 
@@ -602,10 +828,11 @@ private final class PreviewControlButton: NSButton {
         NSColor(calibratedWhite: 0.18, alpha: 0.68).setStroke()
 
         let path = NSBezierPath()
-        path.lineWidth = 1.25
+        let inset = rect.width * 0.29
+        path.lineWidth = max(1.25, rect.width * 0.095)
         path.lineCapStyle = .round
-        path.move(to: NSPoint(x: rect.minX + 3.15, y: rect.midY))
-        path.line(to: NSPoint(x: rect.maxX - 3.15, y: rect.midY))
+        path.move(to: NSPoint(x: rect.minX + inset, y: rect.midY))
+        path.line(to: NSPoint(x: rect.maxX - inset, y: rect.midY))
         path.stroke()
     }
 }

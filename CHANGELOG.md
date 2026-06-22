@@ -2,6 +2,12 @@
 
 All notable DockWindowPreview release changes are tracked here.
 
+## v0.4.8 - 2026-06-22
+
+- Adjusted the app icon artwork scale so it no longer appears oversized in Launchpad.
+- Regenerated the bundled `.icns` and README logo assets from the inset icon source.
+- Documented the icon inset requirement for future maintainers.
+
 ## v0.4.7 - 2026-06-22
 
 - Replaced the app icon with the new supplied logo and regenerated the bundled `.icns`.

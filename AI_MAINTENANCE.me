@@ -39,7 +39,7 @@ Do not change these unless explicitly requested:
 - Deployment target: macOS 13+
 - App mode: `LSUIElement = true`
 
-The app icon is currently a raw `.icns` resource referenced by `CFBundleIconFile = AppIcon`. If changing the logo, regenerate `DockWindowPreview/AppIcon.icns` and update the README logo asset/link.
+The app icon is currently a raw `.icns` resource referenced by `CFBundleIconFile = AppIcon`. If changing the logo, regenerate `DockWindowPreview/AppIcon.icns` and update the README logo asset/link. Keep the visible icon artwork inset inside the 1024 canvas; a full-bleed rounded square looks oversized in Launchpad.
 
 ## Build Verification
 

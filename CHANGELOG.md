@@ -2,6 +2,14 @@
 
 All notable Y-Dock release changes are tracked here.
 
+## v1.0.1 - 2026-06-22
+
+- Reduced `Option+Tab` startup lag by showing a lightweight switcher immediately, then loading thumbnails asynchronously.
+- Added a fast visible-window path for the switcher and lazy background completion for minimized windows.
+- Moved Dock hover thumbnail prewarming off the main thread to reduce stutter while sweeping across Dock icons.
+- Reworked Dock previews and the `Option+Tab` switcher into joined Windows-style cards with no outer container frame.
+- Added thread-safe thumbnail cache access for background prewarming and asynchronous thumbnail updates.
+
 ## v1.0.0 - 2026-06-22
 
 - Added a Windows-style `Option+Tab` window switcher built with public Carbon hotkey APIs.

@@ -36,6 +36,7 @@ final class WindowThumbnailProvider {
     private var previewThumbnailCache: [PreviewThumbnailKey: CachedPreviewThumbnail] = [:]
     private var cacheOrder: [WindowSnapshotKey] = []
     private var previewCacheOrder: [PreviewThumbnailKey] = []
+    private let cacheLock = NSLock()
     private let maximumCachedSnapshots = 80
     private let maximumCachedPreviewThumbnails = 180
     private let previewThumbnailCacheTTL: TimeInterval = 8.0
@@ -79,6 +80,10 @@ final class WindowThumbnailProvider {
         return image
     }
 
+    func placeholderThumbnail(for window: WindowInfo, targetSize: NSSize, reason: String = "正在载入") -> NSImage {
+        placeholderImage(title: window.title, reason: reason, size: targetSize)
+    }
+
     func focusImage(for window: WindowInfo, targetSize: NSSize) -> NSImage? {
         if let capturedImage = captureWindowImage(for: window, targetSize: targetSize) {
             cache(capturedImage, for: window)
@@ -100,6 +105,9 @@ final class WindowThumbnailProvider {
     }
 
     func invalidatePreviewCache(ownerPID: pid_t) {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+
         previewThumbnailCache = previewThumbnailCache.filter { $0.key.ownerPID != ownerPID }
         previewCacheOrder.removeAll { $0.ownerPID == ownerPID }
     }
@@ -119,12 +127,18 @@ final class WindowThumbnailProvider {
 
     private func cachedThumbnail(for window: WindowInfo, targetSize: NSSize) -> NSImage? {
         let exactKey = snapshotKey(for: window)
-        if let image = snapshotCache[exactKey] {
+        let titleKey = WindowTitleKey(ownerPID: window.ownerPID, normalizedTitle: normalize(window.title))
+
+        cacheLock.lock()
+        let exactImage = snapshotCache[exactKey]
+        let titleImage = titleFallbackCache[titleKey]
+        cacheLock.unlock()
+
+        if let image = exactImage {
             return image.resized(to: targetSize)
         }
 
-        let titleKey = WindowTitleKey(ownerPID: window.ownerPID, normalizedTitle: normalize(window.title))
-        if let image = titleFallbackCache[titleKey] {
+        if let image = titleImage {
             DWLog("Using title fallback snapshot for minimized window '\(window.title)'")
             return image.resized(to: targetSize)
         }
@@ -134,9 +148,13 @@ final class WindowThumbnailProvider {
 
     private func cache(_ image: NSImage, for window: WindowInfo) {
         let exactKey = snapshotKey(for: window)
+        let titleKey = WindowTitleKey(ownerPID: window.ownerPID, normalizedTitle: normalize(window.title))
+
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+
         snapshotCache[exactKey] = image
 
-        let titleKey = WindowTitleKey(ownerPID: window.ownerPID, normalizedTitle: normalize(window.title))
         titleFallbackCache[titleKey] = image
 
         cacheOrder.removeAll { $0 == exactKey }
@@ -149,6 +167,9 @@ final class WindowThumbnailProvider {
     }
 
     private func cachedPreviewThumbnail(for key: PreviewThumbnailKey) -> NSImage? {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+
         guard let cached = previewThumbnailCache[key] else { return nil }
 
         let age = Date.timeIntervalSinceReferenceDate - cached.createdAt
@@ -162,6 +183,9 @@ final class WindowThumbnailProvider {
     }
 
     private func cachePreviewThumbnail(_ image: NSImage, for key: PreviewThumbnailKey) {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+
         previewThumbnailCache[key] = CachedPreviewThumbnail(
             image: image,
             createdAt: Date.timeIntervalSinceReferenceDate

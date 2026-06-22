@@ -3,9 +3,9 @@ import Foundation
 import QuartzCore
 
 private enum PreviewPanelLayout {
-    static let panelInset: CGFloat = 5
-    static let rowSpacing: CGFloat = 5
-    static let cardSpacing: CGFloat = 5
+    static let panelInset: CGFloat = 0
+    static let rowSpacing: CGFloat = 6
+    static let cardSpacing: CGFloat = 0
     static let cardInset: CGFloat = 4
     static let titleImageSpacing: CGFloat = 2
     static let titleRowHeight: CGFloat = 24
@@ -62,7 +62,7 @@ final class PreviewPanel: NSPanel {
         level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue - 1)
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle, .stationary]
         isOpaque = false
-        hasShadow = true
+        hasShadow = false
         backgroundColor = .clear
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
@@ -138,12 +138,8 @@ final class PreviewPanel: NSPanel {
     }
 
     private func setupContent() {
-        rootView.material = .hudWindow
-        rootView.blendingMode = .behindWindow
-        rootView.state = .active
         rootView.wantsLayer = true
-        rootView.layer?.cornerRadius = 14
-        rootView.layer?.masksToBounds = true
+        rootView.layer?.backgroundColor = NSColor.clear.cgColor
         contentView = rootView
 
         stackView.orientation = .vertical
@@ -202,7 +198,7 @@ final class PreviewPanel: NSPanel {
                 self?.focusOverlay.hide()
             }
 
-            for item in group {
+            for (index, item) in group.enumerated() {
                 let card = WindowPreviewCardView(
                     window: item.window,
                     appIcon: appIcon,
@@ -210,6 +206,7 @@ final class PreviewPanel: NSPanel {
                     thumbnailSize: item.thumbnailSize,
                     settings: settings
                 )
+                card.joinedPosition = PreviewJoinedCardPosition(index: index, count: group.count)
                 card.onClick = { [weak self] selectedWindow in
                     self?.onSelectWindow?(selectedWindow)
                 }
@@ -487,7 +484,7 @@ private final class WindowPreviewRowView: NSStackView {
     }
 }
 
-private final class PreviewRootView: NSVisualEffectView {
+private final class PreviewRootView: NSView {
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         trackingAreas.forEach(removeTrackingArea)
@@ -500,11 +497,50 @@ private final class PreviewRootView: NSVisualEffectView {
     }
 }
 
+private enum PreviewJoinedCardPosition {
+    case single
+    case leading
+    case middle
+    case trailing
+
+    init(index: Int, count: Int) {
+        if count <= 1 {
+            self = .single
+        } else if index == 0 {
+            self = .leading
+        } else if index == count - 1 {
+            self = .trailing
+        } else {
+            self = .middle
+        }
+    }
+
+    var maskedCorners: CACornerMask {
+        switch self {
+        case .single:
+            return [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        case .leading:
+            return [.layerMinXMinYCorner, .layerMinXMaxYCorner]
+        case .middle:
+            return []
+        case .trailing:
+            return [.layerMaxXMinYCorner, .layerMaxXMaxYCorner]
+        }
+    }
+}
+
 private final class WindowPreviewCardView: NSView {
     var onClick: ((WindowInfo) -> Void)?
     var onClose: ((WindowInfo) -> Void)?
     var onMinimize: ((WindowInfo) -> Void)?
     var onQuitApplication: ((WindowInfo) -> Void)?
+
+    var joinedPosition: PreviewJoinedCardPosition = .single {
+        didSet {
+            layer?.maskedCorners = joinedPosition.maskedCorners
+            imageView.layer?.maskedCorners = joinedPosition.maskedCorners
+        }
+    }
 
     private let windowInfo: WindowInfo
     private let iconView = NSImageView()
@@ -525,7 +561,9 @@ private final class WindowPreviewCardView: NSView {
         super.init(frame: .zero)
 
         wantsLayer = true
-        layer?.cornerRadius = 9
+        layer?.cornerRadius = 12
+        layer?.cornerCurve = .continuous
+        layer?.maskedCorners = joinedPosition.maskedCorners
         layer?.backgroundColor = NSColor(calibratedWhite: 1, alpha: 0.06).cgColor
         layer?.borderWidth = 1
         layer?.borderColor = NSColor(calibratedWhite: 1, alpha: 0.10).cgColor
@@ -660,7 +698,9 @@ private final class WindowPreviewCardView: NSView {
         imageView.image = thumbnail
         imageView.imageScaling = .scaleProportionallyUpOrDown
         imageView.wantsLayer = true
-        imageView.layer?.cornerRadius = 6
+        imageView.layer?.cornerRadius = 8
+        imageView.layer?.cornerCurve = .continuous
+        imageView.layer?.maskedCorners = joinedPosition.maskedCorners
         imageView.layer?.masksToBounds = true
         imageView.widthAnchor.constraint(equalToConstant: thumbnailSize.width).isActive = true
         imageView.heightAnchor.constraint(equalToConstant: thumbnailSize.height).isActive = true

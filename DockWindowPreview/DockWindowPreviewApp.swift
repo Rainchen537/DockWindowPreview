@@ -31,6 +31,7 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
     private let previewWindowCacheTTL: TimeInterval = 1.6
     private let previewPrewarmDelay: TimeInterval = 0.030
     private let maximumPrewarmedWindows = 6
+    private let previewPrewarmQueue = DispatchQueue(label: "com.ydock.preview-prewarm", qos: .utility)
     private var previewPrewarmWorkItem: DispatchWorkItem?
     private var previewPrewarmIdentity: String?
 
@@ -251,10 +252,13 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
         let windows = previewWindows(for: app)
         guard !windows.isEmpty else { return }
 
-        thumbnailProvider.warmThumbnails(
-            for: Array(windows.prefix(maximumPrewarmedWindows)),
-            settings: settings
-        )
+        let windowsToWarm = Array(windows.prefix(maximumPrewarmedWindows))
+        previewPrewarmQueue.async { [thumbnailProvider, settings] in
+            thumbnailProvider.warmThumbnails(
+                for: windowsToWarm,
+                settings: settings
+            )
+        }
     }
 
     private func closeWindowFromPreview(_ window: WindowInfo) {

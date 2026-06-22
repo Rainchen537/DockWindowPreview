@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Rainchen537/DockWindowPreview/releases/tag/v1.0.0">
+  <a href="https://github.com/Rainchen537/DockWindowPreview/releases/tag/v1.0.1">
     <img alt="Release" src="https://img.shields.io/github/v/release/Rainchen537/DockWindowPreview?style=for-the-badge&color=1f8fff">
   </a>
   <img alt="macOS" src="https://img.shields.io/badge/macOS-13%2B-111827?style=for-the-badge&logo=apple">
@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Rainchen537/DockWindowPreview/releases/download/v1.0.0/Y-Dock-v1.0.0.dmg">
+  <a href="https://github.com/Rainchen537/DockWindowPreview/releases/download/v1.0.1/Y-Dock-v1.0.1.dmg">
     <img alt="Download DMG" src="https://img.shields.io/badge/Download-DMG-2563EB?style=for-the-badge&logo=github">
   </a>
 </p>
@@ -37,8 +37,10 @@
 | 功能 | 体验 |
 | --- | --- |
 | 🪟 Dock 悬浮预览 | 鼠标停在 Dock 中某个 App 图标上，弹出该 App 的窗口预览面板。 |
+| 🧩 拼接式卡片 | 去掉外层矩形容器，多窗口预览像 Windows 任务栏一样合并成一组。 |
 | ⚡ 快速切换窗口 | 点击任意缩略图，直接激活 App 并聚焦对应窗口。 |
 | ⌥ Option+Tab 切换 | 按住 `Option` 后按 `Tab` 呼出窗口切换器，继续按 `Tab` 循环，松开 `Option` 激活选中窗口。 |
+| 🚀 异步缩略图 | 首屏先显示轻量卡片，缩略图后台补齐，减少热键和 Dock 横扫卡顿。 |
 | 💤 唤回最小化窗口 | 被最小化的窗口也会出现在预览里，点击后自动恢复并置前。 |
 | 🎚 卡片窗口控制 | hover 某个窗口卡片，左上角显示退出 App、关闭窗口、最小化窗口三颗控制按钮。 |
 | 🎯 临时聚焦预览 | hover 卡片超过 `50ms` 后，用轻量覆盖层突出当前窗口快照，不改变真实桌面状态。 |
@@ -48,7 +50,7 @@
 ## 📦 安装
 
 1. 下载最新版 DMG：  
-   [Y-Dock-v1.0.0.dmg](https://github.com/Rainchen537/DockWindowPreview/releases/download/v1.0.0/Y-Dock-v1.0.0.dmg)
+   [Y-Dock-v1.0.1.dmg](https://github.com/Rainchen537/DockWindowPreview/releases/download/v1.0.1/Y-Dock-v1.0.1.dmg)
 2. 打开 DMG。
 3. 将 `Y-Dock.app` 拖到 `Applications`。
 4. 启动 `Y-Dock`，按提示开启权限。

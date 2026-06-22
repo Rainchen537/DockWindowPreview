@@ -1,5 +1,6 @@
 import AppKit
 import Carbon
+import QuartzCore
 
 private struct OptionTabItem {
     let window: WindowInfo
@@ -36,7 +37,10 @@ final class OptionTabSwitcher {
     private var isSwitching = false
     private var items: [OptionTabItem] = []
     private var selectedIndex = 0
+    private var sessionID = 0
 
+    private let collectorQueue = DispatchQueue(label: "com.ydock.option-tab.collector", qos: .userInitiated)
+    private let thumbnailQueue = DispatchQueue(label: "com.ydock.option-tab.thumbnails", qos: .userInitiated)
     private let hotKeySignature = OSType(UInt32(bigEndian: 0x59444F43)) // "YDCK"
 
     init(
@@ -201,7 +205,9 @@ final class OptionTabSwitcher {
             return
         }
 
-        let windows = windowCollector.switchableWindows()
+        let fastWindows = windowCollector.switchableWindows(includeMinimized: false)
+        let usedFastPath = !fastWindows.isEmpty
+        let windows = usedFastPath ? fastWindows : windowCollector.switchableWindows(includeMinimized: true)
         guard !windows.isEmpty else {
             NSSound.beep()
             return
@@ -214,11 +220,18 @@ final class OptionTabSwitcher {
         }
 
         isSwitching = true
+        sessionID += 1
+        let currentSessionID = sessionID
         selectedIndex = items.count > 1
             ? (direction > 0 ? 1 : items.count - 1)
             : 0
 
         panel.show(items: items, selectedIndex: selectedIndex)
+        loadThumbnails(for: items, sessionID: currentSessionID)
+
+        if usedFastPath {
+            loadExpandedWindowListIfNeeded(sessionID: currentSessionID)
+        }
     }
 
     private func moveSelection(direction: Int) {
@@ -249,6 +262,7 @@ final class OptionTabSwitcher {
     }
 
     private func resetState() {
+        sessionID += 1
         panel.hide()
         isSwitching = false
         items = []
@@ -262,7 +276,7 @@ final class OptionTabSwitcher {
             }
 
             let targetSize = thumbnailTargetSize(for: window)
-            let thumbnail = thumbnailProvider.thumbnail(for: window, targetSize: targetSize)
+            let thumbnail = thumbnailProvider.placeholderThumbnail(for: window, targetSize: targetSize)
             let appName = app.localizedName ?? window.ownerName
             let icon = app.icon ?? NSImage(named: NSImage.applicationIconName) ?? AppIconFactory.appIcon(size: 64)
 
@@ -273,6 +287,66 @@ final class OptionTabSwitcher {
                 thumbnail: thumbnail,
                 thumbnailSize: targetSize
             )
+        }
+    }
+
+    private func loadThumbnails(for items: [OptionTabItem], sessionID: Int) {
+        thumbnailQueue.async { [weak self] in
+            guard let self else { return }
+
+            for item in items {
+                let image = self.thumbnailProvider.thumbnail(for: item.window, targetSize: item.thumbnailSize)
+                DispatchQueue.main.async { [weak self] in
+                    guard
+                        let self,
+                        self.isSwitching,
+                        self.sessionID == sessionID
+                    else {
+                        return
+                    }
+
+                    self.panel.updateThumbnail(image, for: item.window.windowID)
+                }
+            }
+        }
+    }
+
+    private func loadExpandedWindowListIfNeeded(sessionID: Int) {
+        guard AXIsProcessTrusted() else { return }
+
+        collectorQueue.async { [weak self] in
+            guard let self else { return }
+
+            let windows = self.windowCollector.switchableWindows(includeMinimized: true)
+            DispatchQueue.main.async { [weak self] in
+                guard
+                    let self,
+                    self.isSwitching,
+                    self.sessionID == sessionID,
+                    !windows.isEmpty
+                else {
+                    return
+                }
+
+                let currentIDs = self.items.map(\.window.windowID)
+                let nextIDs = windows.map(\.windowID)
+                guard currentIDs != nextIDs else { return }
+
+                let selectedWindowID = self.items.indices.contains(self.selectedIndex)
+                    ? self.items[self.selectedIndex].window.windowID
+                    : nil
+
+                self.items = self.makeItems(from: windows)
+                if let selectedWindowID,
+                   let preservedIndex = self.items.firstIndex(where: { $0.window.windowID == selectedWindowID }) {
+                    self.selectedIndex = preservedIndex
+                } else {
+                    self.selectedIndex = min(self.selectedIndex, max(0, self.items.count - 1))
+                }
+
+                self.panel.show(items: self.items, selectedIndex: self.selectedIndex)
+                self.loadThumbnails(for: self.items, sessionID: sessionID)
+            }
         }
     }
 
@@ -288,16 +362,16 @@ private final class OptionTabPanel: NSPanel {
     var onClickItem: ((Int) -> Void)?
 
     private enum Metrics {
-        static let outerPadding: CGFloat = 16
-        static let cardGap: CGFloat = 10
-        static let rowGap: CGFloat = 10
+        static let outerPadding: CGFloat = 0
+        static let cardGap: CGFloat = 0
+        static let rowGap: CGFloat = 8
         static let maxColumns = 5
         static let minPanelWidth: CGFloat = 360
         static let maxPanelWidth: CGFloat = 980
         static let maxPanelHeightInset: CGFloat = 150
     }
 
-    private let backgroundView = NSVisualEffectView()
+    private let backgroundView = NSView()
     private let scrollView = NSScrollView()
     private let documentView = NSView()
     private let stackView = NSStackView()
@@ -315,7 +389,7 @@ private final class OptionTabPanel: NSPanel {
         level = .screenSaver
         isOpaque = false
         backgroundColor = .clear
-        hasShadow = true
+        hasShadow = false
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle, .stationary]
@@ -347,16 +421,15 @@ private final class OptionTabPanel: NSPanel {
         scrollSelectedCardToVisible(index)
     }
 
+    func updateThumbnail(_ image: NSImage, for windowID: CGWindowID) {
+        guard let card = cardViews.first(where: { $0.windowID == windowID }) else { return }
+        card.updateThumbnail(image)
+    }
+
     private func setupViews() {
         backgroundView.translatesAutoresizingMaskIntoConstraints = false
-        backgroundView.material = .hudWindow
-        backgroundView.blendingMode = .behindWindow
-        backgroundView.state = .active
         backgroundView.wantsLayer = true
-        backgroundView.layer?.cornerRadius = 18
-        backgroundView.layer?.cornerCurve = .continuous
-        backgroundView.layer?.borderColor = NSColor.white.withAlphaComponent(0.16).cgColor
-        backgroundView.layer?.borderWidth = 1
+        backgroundView.layer?.backgroundColor = NSColor.clear.cgColor
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.drawsBackground = false
@@ -407,9 +480,10 @@ private final class OptionTabPanel: NSPanel {
             row.spacing = Metrics.cardGap
             row.translatesAutoresizingMaskIntoConstraints = false
 
-            for item in rowItems {
+            for (rowIndex, item) in rowItems.enumerated() {
                 let globalIndex = cardViews.count
                 let card = OptionTabCardView(item: item)
+                card.joinedPosition = JoinedCardPosition(index: rowIndex, count: rowItems.count)
                 card.onClick = { [weak self] in
                     self?.onClickItem?(globalIndex)
                 }
@@ -479,8 +553,47 @@ private final class OptionTabPanel: NSPanel {
     }
 }
 
+private enum JoinedCardPosition {
+    case single
+    case leading
+    case middle
+    case trailing
+
+    init(index: Int, count: Int) {
+        if count <= 1 {
+            self = .single
+        } else if index == 0 {
+            self = .leading
+        } else if index == count - 1 {
+            self = .trailing
+        } else {
+            self = .middle
+        }
+    }
+
+    var maskedCorners: CACornerMask {
+        switch self {
+        case .single:
+            return [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+        case .leading:
+            return [.layerMinXMinYCorner, .layerMinXMaxYCorner]
+        case .middle:
+            return []
+        case .trailing:
+            return [.layerMaxXMinYCorner, .layerMaxXMaxYCorner]
+        }
+    }
+}
+
 private final class OptionTabCardView: NSView {
     var onClick: (() -> Void)?
+
+    var joinedPosition: JoinedCardPosition = .single {
+        didSet {
+            layer?.maskedCorners = joinedPosition.maskedCorners
+            thumbnailView.layer?.maskedCorners = joinedPosition.maskedCorners
+        }
+    }
 
     var isSelected = false {
         didSet {
@@ -489,11 +602,11 @@ private final class OptionTabCardView: NSView {
     }
 
     private enum Metrics {
-        static let horizontalPadding: CGFloat = 10
-        static let verticalPadding: CGFloat = 10
+        static let horizontalPadding: CGFloat = 8
+        static let verticalPadding: CGFloat = 8
         static let iconSize: CGFloat = 24
-        static let titleHeight: CGFloat = 38
-        static let thumbnailCornerRadius: CGFloat = 8
+        static let titleHeight: CGFloat = 34
+        static let thumbnailCornerRadius: CGFloat = 7
     }
 
     private let item: OptionTabItem
@@ -513,10 +626,14 @@ private final class OptionTabCardView: NSView {
         nil
     }
 
+    var windowID: CGWindowID {
+        item.window.windowID
+    }
+
     static func preferredSize(for item: OptionTabItem) -> CGSize {
         CGSize(
             width: max(168, item.thumbnailSize.width + Metrics.horizontalPadding * 2),
-            height: item.thumbnailSize.height + Metrics.verticalPadding * 2 + Metrics.titleHeight + 8
+            height: item.thumbnailSize.height + Metrics.verticalPadding * 2 + Metrics.titleHeight + 4
         )
     }
 
@@ -528,11 +645,16 @@ private final class OptionTabCardView: NSView {
         onClick?()
     }
 
+    func updateThumbnail(_ image: NSImage) {
+        thumbnailView.image = image
+    }
+
     private func setupViews() {
         wantsLayer = true
-        layer?.cornerRadius = 14
+        layer?.cornerRadius = 13
         layer?.cornerCurve = .continuous
         layer?.borderWidth = 1
+        layer?.maskedCorners = joinedPosition.maskedCorners
 
         iconView.translatesAutoresizingMaskIntoConstraints = false
         iconView.imageScaling = .scaleProportionallyUpOrDown
@@ -555,6 +677,7 @@ private final class OptionTabCardView: NSView {
         thumbnailView.layer?.cornerRadius = Metrics.thumbnailCornerRadius
         thumbnailView.layer?.cornerCurve = .continuous
         thumbnailView.layer?.masksToBounds = true
+        thumbnailView.layer?.maskedCorners = joinedPosition.maskedCorners
         thumbnailView.layer?.borderWidth = 1
         thumbnailView.layer?.borderColor = NSColor.white.withAlphaComponent(0.1).cgColor
 

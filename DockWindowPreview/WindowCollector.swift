@@ -111,7 +111,7 @@ final class WindowCollector {
         return results
     }
 
-    func switchableWindows() -> [WindowInfo] {
+    func switchableWindows(includeMinimized: Bool = true) -> [WindowInfo] {
         let currentPID = ProcessInfo.processInfo.processIdentifier
         let switchableApps = NSWorkspace.shared.runningApplications.filter { app in
             !app.isTerminated
@@ -190,6 +190,10 @@ final class WindowCollector {
                 ownerName: ownerName,
                 isMinimized: false
             ))
+        }
+
+        guard includeMinimized else {
+            return results
         }
 
         let remainingPIDs = switchableApps

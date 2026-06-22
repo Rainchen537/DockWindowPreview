@@ -11,6 +11,7 @@ Core behavior:
 - Watches global mouse movement and performs best-effort Dock icon hit testing through Accessibility.
 - Shows an AppKit `NSPanel` preview near Dock icons with one card per window.
 - Registers `Option+Tab` with public Carbon hotkey APIs for a Windows-style window switcher.
+- Keeps preview UI lightweight: show panels quickly, then fill thumbnails from background queues where possible.
 - Uses CoreGraphics window lists and snapshots for thumbnails.
 - Uses Accessibility to raise, focus, minimize, close, restore minimized windows, or terminate the owning app.
 - Uses public APIs only. macOS does not expose a public Dock hover/window-preview API.
@@ -126,6 +127,7 @@ Launchpad and Finder can cache app icons for existing bundle identifiers. If the
 
 - Avoid private APIs.
 - Keep UI work on the main thread.
+- Keep expensive thumbnail capture/prewarming away from mouse and hotkey event handlers.
 - Keep mouse tracking throttled and cancellable.
 - Do not rewrite Dock/window matching unless the user explicitly asks; it is intentionally best-effort because macOS does not expose stable public Dock hover metadata.
 - Do not convert the menu bar popover into a normal settings window unless explicitly requested.

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/readme/logo-v0.4.0.png" width="128" height="128" alt="DockWindowPreview logo">
+  <img src="assets/readme/logo-v0.4.7.png" width="128" height="128" alt="DockWindowPreview logo">
 </p>
 
 <h1 align="center">DockWindowPreview</h1>
@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Rainchen537/DockWindowPreview/releases/tag/v0.4.6">
+  <a href="https://github.com/Rainchen537/DockWindowPreview/releases/tag/v0.4.7">
     <img alt="Release" src="https://img.shields.io/github/v/release/Rainchen537/DockWindowPreview?style=for-the-badge&color=1f8fff">
   </a>
   <img alt="macOS" src="https://img.shields.io/badge/macOS-13%2B-111827?style=for-the-badge&logo=apple">
@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Rainchen537/DockWindowPreview/releases/download/v0.4.6/DockWindowPreview-v0.4.6.dmg">
+  <a href="https://github.com/Rainchen537/DockWindowPreview/releases/download/v0.4.7/DockWindowPreview-v0.4.7.dmg">
     <img alt="Download DMG" src="https://img.shields.io/badge/Download-DMG-2563EB?style=for-the-badge&logo=github">
   </a>
 </p>
@@ -47,7 +47,7 @@
 ## 📦 安装
 
 1. 下载最新版 DMG：  
-   [DockWindowPreview-v0.4.6.dmg](https://github.com/Rainchen537/DockWindowPreview/releases/download/v0.4.6/DockWindowPreview-v0.4.6.dmg)
+   [DockWindowPreview-v0.4.7.dmg](https://github.com/Rainchen537/DockWindowPreview/releases/download/v0.4.7/DockWindowPreview-v0.4.7.dmg)
 2. 打开 DMG。
 3. 将 `DockWindowPreview.app` 拖到 `Applications`。
 4. 启动 `DockWindowPreview`，按提示开启权限。
@@ -87,7 +87,7 @@ System Settings
 
 ## ⚙️ 设置
 
-点击菜单栏图标或 Dock 图标可打开设置。
+点击菜单栏图标可打开设置。DockWindowPreview 是后台菜单栏工具，默认不会显示在 Dock 或 Cmd-Tab 中。
 
 可调整：
 
@@ -124,6 +124,10 @@ xcodebuild -project DockWindowPreview.xcodeproj \
   -configuration Release \
   build
 ```
+
+## 🧾 更新日志
+
+完整更新记录见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 🚧 已知限制
 

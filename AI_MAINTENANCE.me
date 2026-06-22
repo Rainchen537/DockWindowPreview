@@ -1,0 +1,126 @@
+# DockWindowPreview AI Maintenance Notes
+
+This file is for future AI/code agents maintaining DockWindowPreview. Keep it concise, practical, and current. User-facing release history lives in `CHANGELOG.md`; update that file for every release.
+
+## Product Summary
+
+DockWindowPreview is a lightweight macOS menu bar utility that mimics the Windows taskbar multi-window preview experience for the macOS Dock.
+
+Core behavior:
+- Runs as a menu bar/background app only. It should not appear in Dock or Cmd-Tab.
+- Watches global mouse movement and performs best-effort Dock icon hit testing through Accessibility.
+- Shows an AppKit `NSPanel` preview near Dock icons with one card per window.
+- Uses CoreGraphics window lists and snapshots for thumbnails.
+- Uses Accessibility to raise, focus, minimize, close, restore minimized windows, or terminate the owning app.
+- Uses public APIs only. macOS does not expose a public Dock hover/window-preview API.
+
+## Important Files
+
+- `DockWindowPreview/main.swift`: app bootstrap.
+- `DockWindowPreview/DockWindowPreviewApp.swift`: app delegate, menu bar item, popover, trackers, update checks, cache coordination.
+- `DockWindowPreview/MouseTracker.swift`: global mouse movement monitor, hover delay, leave delay.
+- `DockWindowPreview/DockInspector.swift`: best-effort Dock area and Dock icon inspection.
+- `DockWindowPreview/WindowCollector.swift`: `CGWindowListCopyWindowInfo` enumeration and filtering.
+- `DockWindowPreview/WindowThumbnailProvider.swift`: thumbnail capture, cache, and fallback thumbnails.
+- `DockWindowPreview/PreviewPanel.swift`: AppKit preview panel UI and card interactions.
+- `DockWindowPreview/FocusOverlayPanel.swift`: lightweight visual focus overlay for hovered thumbnails.
+- `DockWindowPreview/WindowActivator.swift`: AX-based focus, raise, close, minimize, restore.
+- `DockWindowPreview/SettingsWindow.swift`: menu bar popover settings UI.
+- `DockWindowPreview/SettingsComponents.swift`: reusable settings components.
+- `DockWindowPreview/AppIcon.icns`: bundled app icon.
+- `assets/readme/logo*.png`: GitHub README logo assets.
+- `README.md`: public project page.
+- `CHANGELOG.md`: release history.
+
+## App Identity
+
+Do not change these unless explicitly requested:
+- Bundle identifier: `com.lixingchen.DockWindowPreview`
+- Deployment target: macOS 13+
+- App mode: `LSUIElement = true`
+
+The app icon is currently a raw `.icns` resource referenced by `CFBundleIconFile = AppIcon`. If changing the logo, regenerate `DockWindowPreview/AppIcon.icns` and update the README logo asset/link.
+
+## Build Verification
+
+Use these before release:
+
+```sh
+xcodebuild -project DockWindowPreview.xcodeproj \
+  -scheme DockWindowPreview \
+  -configuration Debug \
+  -derivedDataPath build/VerifyDerivedData \
+  CODE_SIGNING_ALLOWED=NO \
+  build
+
+xcodebuild -project DockWindowPreview.xcodeproj \
+  -scheme DockWindowPreview \
+  -configuration Release \
+  -derivedDataPath build/ReleaseDerivedData \
+  CODE_SIGNING_ALLOWED=NO \
+  build
+```
+
+Check the built app:
+
+```sh
+/usr/libexec/PlistBuddy -c "Print :LSUIElement" build/ReleaseDerivedData/Build/Products/Release/DockWindowPreview.app/Contents/Info.plist
+/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" build/ReleaseDerivedData/Build/Products/Release/DockWindowPreview.app/Contents/Info.plist
+/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" build/ReleaseDerivedData/Build/Products/Release/DockWindowPreview.app/Contents/Info.plist
+```
+
+## Release Flow
+
+1. Choose the next version.
+2. Bump `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `DockWindowPreview.xcodeproj/project.pbxproj`.
+3. Update `README.md` release links.
+4. Update `CHANGELOG.md`.
+5. Build Debug and Release.
+6. Package a signed DMG.
+7. Commit, tag, push.
+8. Create a GitHub Release and upload the DMG.
+9. Optionally install the new app into `/Applications` for local verification.
+
+Packaging commands, replacing `0.0.0` with the release version:
+
+```sh
+APP="build/ReleaseDerivedData/Build/Products/Release/DockWindowPreview.app"
+STAGE="$(mktemp -d /tmp/DockWindowPreview-v0.0.0.XXXXXX)"
+ditto --noextattr --norsrc "$APP" "$STAGE/DockWindowPreview.app"
+ln -s /Applications "$STAGE/Applications"
+xattr -cr "$STAGE/DockWindowPreview.app"
+codesign --force --deep --options runtime --timestamp=none --sign "Developer ID Application: Xingchen Li (A94225N8T5)" "$STAGE/DockWindowPreview.app"
+codesign --verify --deep --strict --verbose=2 "$STAGE/DockWindowPreview.app"
+hdiutil create -volname "DockWindowPreview v0.0.0" -srcfolder "$STAGE" -ov -format UDZO "dist/DockWindowPreview-v0.0.0.dmg"
+hdiutil verify "dist/DockWindowPreview-v0.0.0.dmg"
+```
+
+GitHub release with `gh`:
+
+```sh
+git add README.md CHANGELOG.md AI_MAINTENANCE.me DockWindowPreview.xcodeproj/project.pbxproj DockWindowPreview/AppIcon.icns assets/readme/logo.png assets/readme/logo-v0.0.0.png
+git commit -m "Release v0.0.0"
+git tag v0.0.0
+git push origin master
+git push origin v0.0.0
+gh release create v0.0.0 "dist/DockWindowPreview-v0.0.0.dmg" --title "DockWindowPreview v0.0.0" --notes-file build/release-notes-v0.0.0.txt
+```
+
+## Local Install Check
+
+```sh
+pkill -x DockWindowPreview
+ditto "$STAGE/DockWindowPreview.app" /Applications/DockWindowPreview.app
+codesign --verify --deep --strict --verbose=2 /Applications/DockWindowPreview.app
+open -a /Applications/DockWindowPreview.app
+```
+
+Launchpad and Finder can cache app icons for existing bundle identifiers. If the installed icon does not visually refresh immediately, verify the app bundle contains the new `AppIcon.icns`; macOS may update the displayed icon after Dock/Finder cache refresh or reboot.
+
+## Cautions
+
+- Avoid private APIs.
+- Keep UI work on the main thread.
+- Keep mouse tracking throttled and cancellable.
+- Do not rewrite Dock/window matching unless the user explicitly asks; it is intentionally best-effort because macOS does not expose stable public Dock hover metadata.
+- Do not convert the menu bar popover into a normal settings window unless explicitly requested.

@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "100000000000000000000501"
-               BuildableName = "DockWindowPreview.app"
+               BuildableName = "Y-Dock.app"
                BlueprintName = "DockWindowPreview"
                ReferencedContainer = "container:DockWindowPreview.xcodeproj">
             </BuildableReference>
@@ -44,7 +44,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "100000000000000000000501"
-            BuildableName = "DockWindowPreview.app"
+            BuildableName = "Y-Dock.app"
             BlueprintName = "DockWindowPreview"
             ReferencedContainer = "container:DockWindowPreview.xcodeproj">
          </BuildableReference>
@@ -61,7 +61,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "100000000000000000000501"
-            BuildableName = "DockWindowPreview.app"
+            BuildableName = "Y-Dock.app"
             BlueprintName = "DockWindowPreview"
             ReferencedContainer = "container:DockWindowPreview.xcodeproj">
          </BuildableReference>

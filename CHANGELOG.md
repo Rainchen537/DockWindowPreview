@@ -1,6 +1,12 @@
 # Changelog
 
-All notable DockWindowPreview release changes are tracked here.
+All notable Y-Dock release changes are tracked here.
+
+## v0.5.0 - 2026-06-22
+
+- Renamed the user-facing app from DockWindowPreview to Y-Dock.
+- Updated the app bundle display name, settings UI, menus, permission prompts, logs, README, and release packaging name.
+- Kept the existing bundle identifier and GitHub repository name to preserve permissions, update checks, and project continuity.
 
 ## v0.4.8 - 2026-06-22
 

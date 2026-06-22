@@ -46,7 +46,7 @@
 		100000000000000000000117 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		100000000000000000000118 /* SettingsComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsComponents.swift; sourceTree = "<group>"; };
 		100000000000000000000119 /* FocusOverlayPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusOverlayPanel.swift; sourceTree = "<group>"; };
-		100000000000000000000201 /* DockWindowPreview.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DockWindowPreview.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		100000000000000000000201 /* Y-Dock.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Y-Dock.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -97,7 +97,7 @@
 		100000000000000000000403 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				100000000000000000000201 /* DockWindowPreview.app */,
+				100000000000000000000201 /* Y-Dock.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -118,8 +118,8 @@
 			dependencies = (
 			);
 			name = DockWindowPreview;
-			productName = DockWindowPreview;
-			productReference = 100000000000000000000201 /* DockWindowPreview.app */;
+			productName = "Y-Dock";
+			productReference = 100000000000000000000201 /* Y-Dock.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -315,7 +315,7 @@
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_LANGUAGE = en;
 				DEVELOPMENT_TEAM = A94225N8T5;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -326,9 +326,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.4.8;
+				MARKETING_VERSION = 0.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.lixingchen.DockWindowPreview;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "Y-Dock";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -340,7 +340,7 @@
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_LANGUAGE = en;
 				DEVELOPMENT_TEAM = A94225N8T5;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -351,9 +351,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.4.8;
+				MARKETING_VERSION = 0.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.lixingchen.DockWindowPreview;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "Y-Dock";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;

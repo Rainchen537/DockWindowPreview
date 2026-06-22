@@ -75,7 +75,7 @@ final class UpdateChecker {
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.timeoutInterval = 12
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("DockWindowPreview/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+        request.setValue("\(AppBranding.displayName)/\(currentVersion)", forHTTPHeaderField: "User-Agent")
 
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             guard let self else { return }

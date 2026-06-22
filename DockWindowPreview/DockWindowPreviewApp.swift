@@ -89,7 +89,7 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
         }
         mouseTracker.start()
         scheduleStartupUpdateCheck()
-        DWLog("DockWindowPreview launched")
+        DWLog("\(AppBranding.displayName) launched")
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -114,7 +114,7 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
         appMenu.addItem(menuItem(title: "设置...", action: #selector(openSettings), keyEquivalent: ","))
         appMenu.addItem(menuItem(title: "请求隐私权限", action: #selector(requestPrivacyPermissions)))
         appMenu.addItem(NSMenuItem.separator())
-        appMenu.addItem(menuItem(title: "退出 DockWindowPreview", action: #selector(quit), keyEquivalent: "q"))
+        appMenu.addItem(menuItem(title: "退出 \(AppBranding.displayName)", action: #selector(quit), keyEquivalent: "q"))
 
         appMenuItem.submenu = appMenu
         mainMenu.addItem(appMenuItem)
@@ -128,7 +128,7 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
             button.image = AppIconFactory.statusBarIcon()
             button.imagePosition = .imageOnly
             button.imageScaling = .scaleProportionallyDown
-            button.toolTip = "DockWindowPreview：点击打开设置"
+            button.toolTip = "\(AppBranding.displayName)：点击打开设置"
             button.target = self
             button.action = #selector(statusItemClicked(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -170,11 +170,11 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
     @discardableResult
     private func showRequestedStartupUIIfNeeded() -> Bool {
         let arguments = ProcessInfo.processInfo.arguments
-        NSLog("[DockWindowPreview] launch arguments: %@", arguments.joined(separator: " "))
+        NSLog("[\(AppBranding.displayName)] launch arguments: %@", arguments.joined(separator: " "))
         guard arguments.contains("--show-status-menu") else { return false }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
-            NSLog("[DockWindowPreview] showing settings popover")
+            NSLog("[\(AppBranding.displayName)] showing settings popover")
             self?.showSettingsPopover(requestPermissions: false)
         }
         return true
@@ -397,7 +397,7 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
     private func showStartupUpdateAlert(_ release: UpdateChecker.ReleaseInfo) {
         let alert = NSAlert()
         alert.alertStyle = .informational
-        alert.messageText = "DockWindowPreview 有新版本 \(release.displayVersion)"
+        alert.messageText = "\(AppBranding.displayName) 有新版本 \(release.displayVersion)"
         alert.informativeText = "\(release.name)\n\n是否打开下载页面？"
         alert.addButton(withTitle: "打开下载页面")
         alert.addButton(withTitle: "稍后")
@@ -421,8 +421,7 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openGitHub() {
-        guard let url = URL(string: "https://github.com/Rainchen537/DockWindowPreview") else { return }
-        NSWorkspace.shared.open(url)
+        NSWorkspace.shared.open(AppBranding.repositoryURL)
     }
 
     @objc private func requestScreenCapturePermission() {

@@ -1,6 +1,12 @@
 import AppKit
 import Foundation
 
+enum AppBranding {
+    static let displayName = "Y-Dock"
+    static let repositoryName = "DockWindowPreview"
+    static let repositoryURL = URL(string: "https://github.com/Rainchen537/DockWindowPreview")!
+}
+
 extension Notification.Name {
     static let appSettingsChanged = Notification.Name("DockWindowPreview.appSettingsChanged")
 }
@@ -98,5 +104,5 @@ final class AppSettings {
 
 func DWLog(_ message: @autoclosure () -> String) {
     guard AppSettings.shared.debugLoggingEnabled else { return }
-    NSLog("[DockWindowPreview] %@", message())
+    NSLog("[\(AppBranding.displayName)] %@", message())
 }

@@ -120,7 +120,7 @@ private final class SettingsViewController: NSViewController {
     private let permissionsManager: PermissionsManager
     private let launchAtLoginManager: LaunchAtLoginManager
     private let updateChecker: UpdateChecker
-    private let githubURL = URL(string: "https://github.com/Rainchen537/DockWindowPreview")!
+    private let githubURL = AppBranding.repositoryURL
 
     private let hoverDelaySlider = NSSlider(value: 0.10, minValue: 0.05, maxValue: 0.8, target: nil, action: nil)
     private let hoverDelayValuePill = SettingsPill(text: "100 ms", tone: .accent)
@@ -243,7 +243,7 @@ private final class SettingsViewController: NSViewController {
     private func headerView() -> NSView {
         SettingsHeaderView(
             icon: AppIconFactory.appIcon(size: 52),
-            title: "DockWindowPreview",
+            title: AppBranding.displayName,
             subtitle: "Dock 多窗口预览 · v\(updateChecker.currentVersion)"
         )
     }
@@ -540,7 +540,7 @@ private final class SettingsViewController: NSViewController {
         let alert = NSAlert()
         alert.alertStyle = .informational
         alert.messageText = "需要批准开机启动"
-        alert.informativeText = "请在 System Settings → General → Login Items 中允许 DockWindowPreview。"
+        alert.informativeText = "请在 System Settings → General → Login Items 中允许 \(AppBranding.displayName)。"
         alert.addButton(withTitle: "打开登录项设置")
         alert.addButton(withTitle: "稍后")
 

@@ -1,10 +1,10 @@
-# DockWindowPreview AI Maintenance Notes
+# Y-Dock AI Maintenance Notes
 
-This file is for future AI/code agents maintaining DockWindowPreview. Keep it concise, practical, and current. User-facing release history lives in `CHANGELOG.md`; update that file for every release.
+This file is for future AI/code agents maintaining Y-Dock. Keep it concise, practical, and current. User-facing release history lives in `CHANGELOG.md`; update that file for every release.
 
 ## Product Summary
 
-DockWindowPreview is a lightweight macOS menu bar utility that mimics the Windows taskbar multi-window preview experience for the macOS Dock.
+Y-Dock is a lightweight macOS menu bar utility that mimics the Windows taskbar multi-window preview experience for the macOS Dock. The GitHub repository and Xcode scheme are still named `DockWindowPreview`.
 
 Core behavior:
 - Runs as a menu bar/background app only. It should not appear in Dock or Cmd-Tab.
@@ -36,6 +36,7 @@ Core behavior:
 
 Do not change these unless explicitly requested:
 - Bundle identifier: `com.lixingchen.DockWindowPreview`
+- Display name: `Y-Dock`
 - Deployment target: macOS 13+
 - App mode: `LSUIElement = true`
 
@@ -64,9 +65,9 @@ xcodebuild -project DockWindowPreview.xcodeproj \
 Check the built app:
 
 ```sh
-/usr/libexec/PlistBuddy -c "Print :LSUIElement" build/ReleaseDerivedData/Build/Products/Release/DockWindowPreview.app/Contents/Info.plist
-/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" build/ReleaseDerivedData/Build/Products/Release/DockWindowPreview.app/Contents/Info.plist
-/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" build/ReleaseDerivedData/Build/Products/Release/DockWindowPreview.app/Contents/Info.plist
+/usr/libexec/PlistBuddy -c "Print :LSUIElement" build/ReleaseDerivedData/Build/Products/Release/Y-Dock.app/Contents/Info.plist
+/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" build/ReleaseDerivedData/Build/Products/Release/Y-Dock.app/Contents/Info.plist
+/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" build/ReleaseDerivedData/Build/Products/Release/Y-Dock.app/Contents/Info.plist
 ```
 
 ## Release Flow
@@ -84,15 +85,15 @@ Check the built app:
 Packaging commands, replacing `0.0.0` with the release version:
 
 ```sh
-APP="build/ReleaseDerivedData/Build/Products/Release/DockWindowPreview.app"
-STAGE="$(mktemp -d /tmp/DockWindowPreview-v0.0.0.XXXXXX)"
-ditto --noextattr --norsrc "$APP" "$STAGE/DockWindowPreview.app"
+APP="build/ReleaseDerivedData/Build/Products/Release/Y-Dock.app"
+STAGE="$(mktemp -d /tmp/Y-Dock-v0.0.0.XXXXXX)"
+ditto --noextattr --norsrc "$APP" "$STAGE/Y-Dock.app"
 ln -s /Applications "$STAGE/Applications"
-xattr -cr "$STAGE/DockWindowPreview.app"
-codesign --force --deep --options runtime --timestamp=none --sign "Developer ID Application: Xingchen Li (A94225N8T5)" "$STAGE/DockWindowPreview.app"
-codesign --verify --deep --strict --verbose=2 "$STAGE/DockWindowPreview.app"
-hdiutil create -volname "DockWindowPreview v0.0.0" -srcfolder "$STAGE" -ov -format UDZO "dist/DockWindowPreview-v0.0.0.dmg"
-hdiutil verify "dist/DockWindowPreview-v0.0.0.dmg"
+xattr -cr "$STAGE/Y-Dock.app"
+codesign --force --deep --options runtime --timestamp=none --sign "Developer ID Application: Xingchen Li (A94225N8T5)" "$STAGE/Y-Dock.app"
+codesign --verify --deep --strict --verbose=2 "$STAGE/Y-Dock.app"
+hdiutil create -volname "Y-Dock v0.0.0" -srcfolder "$STAGE" -ov -format UDZO "dist/Y-Dock-v0.0.0.dmg"
+hdiutil verify "dist/Y-Dock-v0.0.0.dmg"
 ```
 
 GitHub release with `gh`:
@@ -103,16 +104,16 @@ git commit -m "Release v0.0.0"
 git tag v0.0.0
 git push origin master
 git push origin v0.0.0
-gh release create v0.0.0 "dist/DockWindowPreview-v0.0.0.dmg" --title "DockWindowPreview v0.0.0" --notes-file build/release-notes-v0.0.0.txt
+gh release create v0.0.0 "dist/Y-Dock-v0.0.0.dmg" --title "Y-Dock v0.0.0" --notes-file build/release-notes-v0.0.0.txt
 ```
 
 ## Local Install Check
 
 ```sh
-pkill -x DockWindowPreview
-ditto "$STAGE/DockWindowPreview.app" /Applications/DockWindowPreview.app
-codesign --verify --deep --strict --verbose=2 /Applications/DockWindowPreview.app
-open -a /Applications/DockWindowPreview.app
+pkill -x Y-Dock
+ditto "$STAGE/Y-Dock.app" /Applications/Y-Dock.app
+codesign --verify --deep --strict --verbose=2 /Applications/Y-Dock.app
+open -a /Applications/Y-Dock.app
 ```
 
 Launchpad and Finder can cache app icons for existing bundle identifiers. If the installed icon does not visually refresh immediately, verify the app bundle contains the new `AppIcon.icns`; macOS may update the displayed icon after Dock/Finder cache refresh or reboot.

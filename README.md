@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/readme/logo-v0.4.8.png" width="128" height="128" alt="DockWindowPreview logo">
+  <img src="assets/readme/logo-v0.4.8.png" width="128" height="128" alt="Y-Dock logo">
 </p>
 
-<h1 align="center">DockWindowPreview</h1>
+<h1 align="center">Y-Dock</h1>
 
 <p align="center">
   <strong>让 macOS Dock 拥有接近 Windows 任务栏的窗口预览体验。</strong>
@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Rainchen537/DockWindowPreview/releases/tag/v0.4.8">
+  <a href="https://github.com/Rainchen537/DockWindowPreview/releases/tag/v0.5.0">
     <img alt="Release" src="https://img.shields.io/github/v/release/Rainchen537/DockWindowPreview?style=for-the-badge&color=1f8fff">
   </a>
   <img alt="macOS" src="https://img.shields.io/badge/macOS-13%2B-111827?style=for-the-badge&logo=apple">
@@ -23,13 +23,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Rainchen537/DockWindowPreview/releases/download/v0.4.8/DockWindowPreview-v0.4.8.dmg">
+  <a href="https://github.com/Rainchen537/DockWindowPreview/releases/download/v0.5.0/Y-Dock-v0.5.0.dmg">
     <img alt="Download DMG" src="https://img.shields.io/badge/Download-DMG-2563EB?style=for-the-badge&logo=github">
   </a>
 </p>
 
 <p align="center">
-  <img src="assets/readme/preview.svg" alt="DockWindowPreview preview">
+  <img src="assets/readme/preview.svg" alt="Y-Dock preview">
 </p>
 
 ## ✨ 主要功能
@@ -47,16 +47,16 @@
 ## 📦 安装
 
 1. 下载最新版 DMG：  
-   [DockWindowPreview-v0.4.8.dmg](https://github.com/Rainchen537/DockWindowPreview/releases/download/v0.4.8/DockWindowPreview-v0.4.8.dmg)
+   [Y-Dock-v0.5.0.dmg](https://github.com/Rainchen537/DockWindowPreview/releases/download/v0.5.0/Y-Dock-v0.5.0.dmg)
 2. 打开 DMG。
-3. 将 `DockWindowPreview.app` 拖到 `Applications`。
-4. 启动 `DockWindowPreview`，按提示开启权限。
+3. 将 `Y-Dock.app` 拖到 `Applications`。
+4. 启动 `Y-Dock`，按提示开启权限。
 
 > 当前版本已使用 Developer ID 签名，但还没有 notarization。首次打开时如果 macOS 提示无法验证，请在 Finder 中右键 App，选择 **Open / 打开**。
 
 ## 🔑 权限说明
 
-DockWindowPreview 需要两项系统权限，都是为了实现窗口预览和窗口切换：
+Y-Dock 需要两项系统权限，都是为了实现窗口预览和窗口切换：
 
 | 权限 | 用途 |
 | --- | --- |
@@ -79,7 +79,7 @@ System Settings
 
 ## 🧭 使用方式
 
-1. 启动 DockWindowPreview。
+1. 启动 Y-Dock。
 2. 将鼠标移动到 Dock 中正在运行的 App 图标上。
 3. 等待约 `100ms`，预览面板会自动弹出。
 4. 点击缩略图切换到对应窗口。
@@ -87,7 +87,7 @@ System Settings
 
 ## ⚙️ 设置
 
-点击菜单栏图标可打开设置。DockWindowPreview 是后台菜单栏工具，默认不会显示在 Dock 或 Cmd-Tab 中。
+点击菜单栏图标可打开设置。Y-Dock 是后台菜单栏工具，默认不会显示在 Dock 或 Cmd-Tab 中。
 
 可调整：
 
@@ -95,7 +95,7 @@ System Settings
 - `缩略图高度`：默认 `165px`，窗口宽度会按原始比例自适应。
 - `显示窗口标题`：控制预览卡片顶部标题栏。
 - `开机启动`：使用 macOS 官方 `SMAppService.mainApp`。
-- `调试日志`：输出 `[DockWindowPreview]` 前缀日志。
+- `调试日志`：输出 `[Y-Dock]` 前缀日志。
 
 ## 🛠 技术栈
 
@@ -131,7 +131,7 @@ xcodebuild -project DockWindowPreview.xcodeproj \
 
 ## 🚧 已知限制
 
-macOS 没有公开的 Dock hover API，也没有公开 API 可以从 Dock 图标直接得到 bundle identifier。DockWindowPreview 通过 Dock.app 的 Accessibility hit-test 读取 `AXTitle` / `AXDescription`，再 best-effort 映射到正在运行的 App。
+macOS 没有公开的 Dock hover API，也没有公开 API 可以从 Dock 图标直接得到 bundle identifier。Y-Dock 通过 Dock.app 的 Accessibility hit-test 读取 `AXTitle` / `AXDescription`，再 best-effort 映射到正在运行的 App。
 
 公开 Accessibility API 也不稳定暴露 `CGWindowID`。窗口激活使用标题、位置、尺寸等信息匹配 AXWindow，再执行 `AXRaise`、`AXMain` 和 `AXFocused`。
 

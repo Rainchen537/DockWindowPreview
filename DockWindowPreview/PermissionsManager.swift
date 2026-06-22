@@ -50,7 +50,7 @@ final class PermissionsManager {
 
             let alert = NSAlert()
             alert.alertStyle = .informational
-            alert.messageText = "DockWindowPreview 需要权限"
+            alert.messageText = "\(AppBranding.displayName) 需要权限"
             alert.informativeText = """
             请在 System Settings → Privacy & Security 中开启：
 

@@ -37,8 +37,8 @@ final class WindowThumbnailProvider {
     private var cacheOrder: [WindowSnapshotKey] = []
     private var previewCacheOrder: [PreviewThumbnailKey] = []
     private let maximumCachedSnapshots = 80
-    private let maximumCachedPreviewThumbnails = 120
-    private let previewThumbnailCacheTTL: TimeInterval = 2.0
+    private let maximumCachedPreviewThumbnails = 180
+    private let previewThumbnailCacheTTL: TimeInterval = 8.0
 
     func thumbnail(for window: WindowInfo, targetSize: NSSize) -> NSImage {
         let previewKey = previewThumbnailKey(for: window, targetSize: targetSize)
@@ -86,6 +86,17 @@ final class WindowThumbnailProvider {
         }
 
         return cachedThumbnail(for: window, targetSize: targetSize)
+    }
+
+    func warmThumbnails(for windows: [WindowInfo], settings: AppSettings) {
+        guard !windows.isEmpty else { return }
+
+        autoreleasepool {
+            for window in windows {
+                let size = settings.thumbnailSize(for: window)
+                _ = thumbnail(for: window, targetSize: size)
+            }
+        }
     }
 
     func invalidatePreviewCache(ownerPID: pid_t) {

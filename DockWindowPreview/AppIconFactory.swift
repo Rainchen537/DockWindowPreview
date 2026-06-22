@@ -100,21 +100,45 @@ enum AppIconFactory {
     }
 
     static func statusBarIcon() -> NSImage {
-        let image = NSImage(size: NSSize(width: 18, height: 18))
+        let image = NSImage(size: NSSize(width: 19, height: 18))
         image.lockFocus()
 
-        NSColor.black.setFill()
-        NSColor.black.setStroke()
+        let stroke = NSColor.black
+        let softFill = NSColor.black.withAlphaComponent(0.18)
+        let strongFill = NSColor.black.withAlphaComponent(0.92)
+        stroke.setStroke()
 
-        let front = NSBezierPath(roundedRect: NSRect(x: 4, y: 6, width: 10, height: 7.5), xRadius: 2, yRadius: 2)
-        front.lineWidth = 1.6
+        let back = NSBezierPath(roundedRect: NSRect(x: 6.2, y: 7.6, width: 9.4, height: 6.6), xRadius: 2.1, yRadius: 2.1)
+        back.lineWidth = 1.25
+        stroke.withAlphaComponent(0.46).setStroke()
+        back.stroke()
+
+        let middle = NSBezierPath(roundedRect: NSRect(x: 4.8, y: 6.4, width: 10.2, height: 7.4), xRadius: 2.25, yRadius: 2.25)
+        middle.lineWidth = 1.25
+        stroke.withAlphaComponent(0.68).setStroke()
+        middle.stroke()
+
+        let front = NSBezierPath(roundedRect: NSRect(x: 3.2, y: 5.0, width: 10.8, height: 8.1), xRadius: 2.4, yRadius: 2.4)
+        stroke.setStroke()
+        front.lineWidth = 1.55
         front.stroke()
 
-        let titleLine = NSBezierPath(roundedRect: NSRect(x: 6, y: 10.8, width: 6, height: 1.4), xRadius: 0.7, yRadius: 0.7)
+        softFill.setFill()
+        let previewBlock = NSBezierPath(roundedRect: NSRect(x: 5.2, y: 7.2, width: 3.2, height: 3.1), xRadius: 0.9, yRadius: 0.9)
+        previewBlock.fill()
+
+        strongFill.setFill()
+        let titleLine = NSBezierPath(roundedRect: NSRect(x: 9.3, y: 9.3, width: 2.9, height: 1.15), xRadius: 0.55, yRadius: 0.55)
         titleLine.fill()
 
-        let dock = NSBezierPath(roundedRect: NSRect(x: 3, y: 2.5, width: 12, height: 2.2), xRadius: 1.1, yRadius: 1.1)
+        let secondLine = NSBezierPath(roundedRect: NSRect(x: 9.3, y: 7.0, width: 2.35, height: 1.05), xRadius: 0.5, yRadius: 0.5)
+        secondLine.fill()
+
+        let dock = NSBezierPath(roundedRect: NSRect(x: 3.0, y: 2.0, width: 12.8, height: 2.25), xRadius: 1.1, yRadius: 1.1)
         dock.fill()
+
+        let indicator = NSBezierPath(ovalIn: NSRect(x: 8.7, y: 0.8, width: 1.5, height: 1.5))
+        indicator.fill()
 
         image.unlockFocus()
         image.isTemplate = true

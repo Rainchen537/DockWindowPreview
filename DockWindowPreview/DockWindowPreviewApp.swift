@@ -28,7 +28,11 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
     private var settingsPopoverController: SettingsPopoverController?
     private var previewContext: PreviewContext?
     private var previewWindowCache: [pid_t: CachedPreviewWindows] = [:]
-    private let previewWindowCacheTTL: TimeInterval = 0.8
+    private let previewWindowCacheTTL: TimeInterval = 1.6
+    private let previewPrewarmDelay: TimeInterval = 0.030
+    private let maximumPrewarmedWindows = 6
+    private var previewPrewarmWorkItem: DispatchWorkItem?
+    private var previewPrewarmIdentity: String?
 
     private lazy var previewPanel: PreviewPanel = {
         let panel = PreviewPanel(thumbnailProvider: thumbnailProvider, settings: settings)
@@ -57,11 +61,15 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
         tracker.onHoverResolved = { [weak self] item, point in
             self?.showPreview(for: item, anchor: point)
         }
-        tracker.onDockHoverCandidateChanged = { [weak self] in
-            self?.previewPanel.hide()
-            self?.previewContext = nil
+        tracker.onDockHoverCandidateChanged = { [weak self] item, hadPreviousHoverIdentity in
+            if hadPreviousHoverIdentity {
+                self?.previewPanel.hide()
+                self?.previewContext = nil
+            }
+            self?.schedulePreviewPrewarm(for: item)
         }
         tracker.onMouseLeftDockAndPreview = { [weak self] in
+            self?.cancelPreviewPrewarm()
             self?.previewPanel.hide()
             self?.previewContext = nil
         }
@@ -70,10 +78,11 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.retainedDelegate = self
-        NSApp.setActivationPolicy(.regular)
+        NSApp.setActivationPolicy(.accessory)
         setupDockIcon()
         setupApplicationMenu()
         setupStatusItem()
+        observeApplicationLifecycle()
         let isShowingStartupMenu = showRequestedStartupUIIfNeeded()
         if !isShowingStartupMenu {
             permissionsManager.showInitialPermissionGuidanceIfNeeded()
@@ -84,6 +93,7 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        cancelPreviewPrewarm()
         mouseTracker.stop()
     }
 
@@ -176,6 +186,7 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
     }
 
     private func showPreview(for dockItem: DockItem, anchor: NSPoint) {
+        cancelPreviewPrewarm()
         guard let app = dockItem.runningApplication else {
             DWLog("Dock item '\(dockItem.title)' has no running app")
             previewPanel.hide()
@@ -193,6 +204,48 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
 
         previewContext = PreviewContext(appPID: app.processIdentifier, anchor: anchor, dockEdge: dockItem.dockEdge)
         previewPanel.show(windows: windows, app: app, anchor: anchor, dockEdge: dockItem.dockEdge)
+    }
+
+    private func schedulePreviewPrewarm(for dockItem: DockItem) {
+        cancelPreviewPrewarm()
+
+        guard dockItem.runningApplication != nil else { return }
+
+        let identity = dockItem.identity
+        previewPrewarmIdentity = identity
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard
+                let self,
+                self.previewPrewarmIdentity == identity
+            else {
+                return
+            }
+
+            self.previewPrewarmWorkItem = nil
+            self.prewarmPreview(for: dockItem)
+        }
+
+        previewPrewarmWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + previewPrewarmDelay, execute: workItem)
+    }
+
+    private func cancelPreviewPrewarm() {
+        previewPrewarmWorkItem?.cancel()
+        previewPrewarmWorkItem = nil
+        previewPrewarmIdentity = nil
+    }
+
+    private func prewarmPreview(for dockItem: DockItem) {
+        guard let app = dockItem.runningApplication else { return }
+
+        let windows = previewWindows(for: app)
+        guard !windows.isEmpty else { return }
+
+        thumbnailProvider.warmThumbnails(
+            for: Array(windows.prefix(maximumPrewarmedWindows)),
+            settings: settings
+        )
     }
 
     private func closeWindowFromPreview(_ window: WindowInfo) {
@@ -270,6 +323,23 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
     private func invalidatePreviewCaches(ownerPID: pid_t) {
         previewWindowCache.removeValue(forKey: ownerPID)
         thumbnailProvider.invalidatePreviewCache(ownerPID: ownerPID)
+    }
+
+    private func observeApplicationLifecycle() {
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(runningApplicationTerminated(_:)),
+            name: NSWorkspace.didTerminateApplicationNotification,
+            object: nil
+        )
+    }
+
+    @objc private func runningApplicationTerminated(_ notification: Notification) {
+        guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
+            return
+        }
+
+        invalidatePreviewCaches(ownerPID: app.processIdentifier)
     }
 
     @objc private func openSettings() {

@@ -23,7 +23,7 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>LSUIElement</key>
-	<false/>
+	<true/>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>用于辅助激活目标应用窗口。</string>
 	<key>NSHumanReadableCopyright</key>

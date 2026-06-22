@@ -3,7 +3,7 @@ import Foundation
 
 final class MouseTracker {
     var onHoverResolved: ((DockItem, NSPoint) -> Void)?
-    var onDockHoverCandidateChanged: (() -> Void)?
+    var onDockHoverCandidateChanged: ((DockItem, Bool) -> Void)?
     var onMouseLeftDockAndPreview: (() -> Void)?
     var isPointInsidePreviewPanel: ((NSPoint) -> Bool)?
 
@@ -90,9 +90,7 @@ final class MouseTracker {
         guard currentHoverIdentity != item.identity else { return }
         let hadPreviousHoverIdentity = currentHoverIdentity != nil
         currentHoverIdentity = item.identity
-        if hadPreviousHoverIdentity {
-            onDockHoverCandidateChanged?()
-        }
+        onDockHoverCandidateChanged?(item, hadPreviousHoverIdentity)
         scheduleHover(for: item, at: point)
     }
 

@@ -12,6 +12,7 @@ Core behavior:
 - Shows an AppKit `NSPanel` preview near Dock icons with one card per window.
 - Registers `Option+Tab` with public Carbon hotkey APIs for a Windows-style window switcher.
 - Keeps preview UI lightweight: show panels quickly, then fill thumbnails from background queues where possible.
+- Uses different preview layouts by context: Dock hover previews use compact joined cards, while `Option+Tab` uses a single acrylic switcher panel with independent rounded cards and centered wrapping rows.
 - Uses CoreGraphics window lists and snapshots for thumbnails.
 - Uses Accessibility to raise, focus, minimize, close, restore minimized windows, or terminate the owning app.
 - Uses public APIs only. macOS does not expose a public Dock hover/window-preview API.

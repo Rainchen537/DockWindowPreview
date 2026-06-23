@@ -362,16 +362,16 @@ private final class OptionTabPanel: NSPanel {
     var onClickItem: ((Int) -> Void)?
 
     private enum Metrics {
-        static let outerPadding: CGFloat = 0
-        static let cardGap: CGFloat = 0
-        static let rowGap: CGFloat = 8
-        static let maxColumns = 5
+        static let outerPadding: CGFloat = 20
+        static let cardGap: CGFloat = 14
+        static let rowGap: CGFloat = 14
         static let minPanelWidth: CGFloat = 360
-        static let maxPanelWidth: CGFloat = 980
-        static let maxPanelHeightInset: CGFloat = 150
+        static let maxScreenWidthRatio: CGFloat = 0.8
+        static let maxPanelHeightInset: CGFloat = 130
+        static let panelCornerRadius: CGFloat = 24
     }
 
-    private let backgroundView = NSView()
+    private let backgroundView = NSVisualEffectView()
     private let scrollView = NSScrollView()
     private let documentView = NSView()
     private let stackView = NSStackView()
@@ -389,7 +389,7 @@ private final class OptionTabPanel: NSPanel {
         level = .screenSaver
         isOpaque = false
         backgroundColor = .clear
-        hasShadow = false
+        hasShadow = true
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle, .stationary]
@@ -429,7 +429,15 @@ private final class OptionTabPanel: NSPanel {
     private func setupViews() {
         backgroundView.translatesAutoresizingMaskIntoConstraints = false
         backgroundView.wantsLayer = true
-        backgroundView.layer?.backgroundColor = NSColor.clear.cgColor
+        backgroundView.material = .hudWindow
+        backgroundView.blendingMode = .behindWindow
+        backgroundView.state = .active
+        backgroundView.appearance = NSAppearance(named: .darkAqua)
+        backgroundView.layer?.cornerRadius = Metrics.panelCornerRadius
+        backgroundView.layer?.cornerCurve = .continuous
+        backgroundView.layer?.masksToBounds = true
+        backgroundView.layer?.borderWidth = 1
+        backgroundView.layer?.borderColor = NSColor.white.withAlphaComponent(0.16).cgColor
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.drawsBackground = false
@@ -473,17 +481,16 @@ private final class OptionTabPanel: NSPanel {
         stackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
         cardViews = []
 
-        for rowItems in rows(for: currentItems) {
+        for rowItems in rows(for: currentItems, maxContentWidth: maxContentWidth()) {
             let row = NSStackView()
             row.orientation = .horizontal
             row.alignment = .top
             row.spacing = Metrics.cardGap
             row.translatesAutoresizingMaskIntoConstraints = false
 
-            for (rowIndex, item) in rowItems.enumerated() {
+            for item in rowItems {
                 let globalIndex = cardViews.count
                 let card = OptionTabCardView(item: item)
-                card.joinedPosition = JoinedCardPosition(index: rowIndex, count: rowItems.count)
                 card.onClick = { [weak self] in
                     self?.onClickItem?(globalIndex)
                 }
@@ -495,14 +502,36 @@ private final class OptionTabPanel: NSPanel {
         }
     }
 
-    private func rows(for items: [OptionTabItem]) -> [[OptionTabItem]] {
-        stride(from: 0, to: items.count, by: Metrics.maxColumns).map {
-            Array(items[$0..<min($0 + Metrics.maxColumns, items.count)])
+    private func rows(for items: [OptionTabItem], maxContentWidth: CGFloat) -> [[OptionTabItem]] {
+        var rows: [[OptionTabItem]] = []
+        var currentRow: [OptionTabItem] = []
+        var currentWidth: CGFloat = 0
+
+        for item in items {
+            let itemWidth = OptionTabCardView.preferredSize(for: item).width
+            let nextWidth = currentRow.isEmpty ? itemWidth : currentWidth + Metrics.cardGap + itemWidth
+
+            if !currentRow.isEmpty && nextWidth > maxContentWidth {
+                rows.append(currentRow)
+                currentRow = [item]
+                currentWidth = itemWidth
+            } else {
+                currentRow.append(item)
+                currentWidth = nextWidth
+            }
         }
+
+        if !currentRow.isEmpty {
+            rows.append(currentRow)
+        }
+
+        return rows
     }
 
     private func preferredPanelSize(for items: [OptionTabItem]) -> CGSize {
-        let rows = rows(for: items)
+        let screen = screenForPanel()
+        let maxPanelWidth = screen.visibleFrame.width * Metrics.maxScreenWidthRatio
+        let rows = rows(for: items, maxContentWidth: maxContentWidth(for: screen))
         let rowSizes = rows.map { row in
             row.reduce(CGSize.zero) { partial, item in
                 let size = OptionTabCardView.preferredSize(for: item)
@@ -521,13 +550,20 @@ private final class OptionTabPanel: NSPanel {
         let totalHeight = rowSizes.reduce(CGFloat.zero) { $0 + $1.height }
             + CGFloat(max(0, rows.count - 1)) * Metrics.rowGap
 
-        let screen = screenForPanel()
-        let maxWidth = min(Metrics.maxPanelWidth, screen.visibleFrame.width - 80)
+        let maxWidth = min(maxPanelWidth, screen.visibleFrame.width - 80)
         let maxHeight = screen.visibleFrame.height - Metrics.maxPanelHeightInset
 
         return CGSize(
             width: min(max(Metrics.minPanelWidth, widestRow + Metrics.outerPadding * 2), maxWidth),
             height: min(totalHeight + Metrics.outerPadding * 2, maxHeight)
+        )
+    }
+
+    private func maxContentWidth(for screen: NSScreen? = nil) -> CGFloat {
+        let targetScreen = screen ?? screenForPanel()
+        return max(
+            240,
+            targetScreen.visibleFrame.width * Metrics.maxScreenWidthRatio - Metrics.outerPadding * 2
         )
     }
 
@@ -553,47 +589,8 @@ private final class OptionTabPanel: NSPanel {
     }
 }
 
-private enum JoinedCardPosition {
-    case single
-    case leading
-    case middle
-    case trailing
-
-    init(index: Int, count: Int) {
-        if count <= 1 {
-            self = .single
-        } else if index == 0 {
-            self = .leading
-        } else if index == count - 1 {
-            self = .trailing
-        } else {
-            self = .middle
-        }
-    }
-
-    var maskedCorners: CACornerMask {
-        switch self {
-        case .single:
-            return [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
-        case .leading:
-            return [.layerMinXMinYCorner, .layerMinXMaxYCorner]
-        case .middle:
-            return []
-        case .trailing:
-            return [.layerMaxXMinYCorner, .layerMaxXMaxYCorner]
-        }
-    }
-}
-
 private final class OptionTabCardView: NSView {
     var onClick: (() -> Void)?
-
-    var joinedPosition: JoinedCardPosition = .single {
-        didSet {
-            layer?.maskedCorners = joinedPosition.maskedCorners
-            thumbnailView.layer?.maskedCorners = joinedPosition.maskedCorners
-        }
-    }
 
     var isSelected = false {
         didSet {
@@ -654,7 +651,6 @@ private final class OptionTabCardView: NSView {
         layer?.cornerRadius = 13
         layer?.cornerCurve = .continuous
         layer?.borderWidth = 1
-        layer?.maskedCorners = joinedPosition.maskedCorners
 
         iconView.translatesAutoresizingMaskIntoConstraints = false
         iconView.imageScaling = .scaleProportionallyUpOrDown
@@ -664,12 +660,16 @@ private final class OptionTabCardView: NSView {
         titleLabel.textColor = .white
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.maximumNumberOfLines = 1
+        titleLabel.cell?.truncatesLastVisibleLine = true
+        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         appLabel.translatesAutoresizingMaskIntoConstraints = false
         appLabel.font = .systemFont(ofSize: 11, weight: .medium)
         appLabel.textColor = NSColor.white.withAlphaComponent(0.62)
         appLabel.lineBreakMode = .byTruncatingTail
         appLabel.maximumNumberOfLines = 1
+        appLabel.cell?.truncatesLastVisibleLine = true
+        appLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         thumbnailView.translatesAutoresizingMaskIntoConstraints = false
         thumbnailView.imageScaling = .scaleProportionallyUpOrDown
@@ -677,7 +677,6 @@ private final class OptionTabCardView: NSView {
         thumbnailView.layer?.cornerRadius = Metrics.thumbnailCornerRadius
         thumbnailView.layer?.cornerCurve = .continuous
         thumbnailView.layer?.masksToBounds = true
-        thumbnailView.layer?.maskedCorners = joinedPosition.maskedCorners
         thumbnailView.layer?.borderWidth = 1
         thumbnailView.layer?.borderColor = NSColor.white.withAlphaComponent(0.1).cgColor
 
@@ -686,6 +685,7 @@ private final class OptionTabCardView: NSView {
         textStack.orientation = .vertical
         textStack.alignment = .leading
         textStack.spacing = 2
+        textStack.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         addSubview(iconView)
         addSubview(textStack)

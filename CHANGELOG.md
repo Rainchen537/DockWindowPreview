@@ -2,6 +2,13 @@
 
 All notable Y-Dock release changes are tracked here.
 
+## v1.0.2 - 2026-06-23
+
+- Redesigned the `Option+Tab` switcher as a single acrylic panel containing independent rounded window cards.
+- Changed the switcher layout to wrap rows at 80% of the current screen width and center each row.
+- Fixed long window titles in the switcher so they truncate inside the card width instead of stretching the layout.
+- Kept Dock hover previews on the compact joined-card design introduced in `v1.0.1`.
+
 ## v1.0.1 - 2026-06-22
 
 - Reduced `Option+Tab` startup lag by showing a lightweight switcher immediately, then loading thumbnails asynchronously.

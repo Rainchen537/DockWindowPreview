@@ -4,7 +4,6 @@ import QuartzCore
 
 private struct OptionTabItem {
     let window: WindowInfo
-    let appName: String
     let appIcon: NSImage
     let thumbnail: NSImage
     let thumbnailSize: NSSize
@@ -33,6 +32,8 @@ final class OptionTabSwitcher {
     private var backwardHotKey: EventHotKeyRef?
     private var globalFlagsMonitor: Any?
     private var localFlagsMonitor: Any?
+    private var globalKeyMonitor: Any?
+    private var localKeyMonitor: Any?
     private var isStarted = false
     private var isSwitching = false
     private var items: [OptionTabItem] = []
@@ -83,12 +84,20 @@ final class OptionTabSwitcher {
         if let localFlagsMonitor {
             NSEvent.removeMonitor(localFlagsMonitor)
         }
+        if let globalKeyMonitor {
+            NSEvent.removeMonitor(globalKeyMonitor)
+        }
+        if let localKeyMonitor {
+            NSEvent.removeMonitor(localKeyMonitor)
+        }
 
         forwardHotKey = nil
         backwardHotKey = nil
         eventHandler = nil
         globalFlagsMonitor = nil
         localFlagsMonitor = nil
+        globalKeyMonitor = nil
+        localKeyMonitor = nil
         isStarted = false
     }
 
@@ -179,6 +188,19 @@ final class OptionTabSwitcher {
             self?.handleFlagsChanged(event.modifierFlags)
             return event
         }
+
+        globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            DispatchQueue.main.async {
+                _ = self?.handleKeyDown(event)
+            }
+        }
+
+        localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if self?.handleKeyDown(event) == true {
+                return nil
+            }
+            return event
+        }
     }
 
     private func handleHotKey(id: UInt32) {
@@ -197,6 +219,16 @@ final class OptionTabSwitcher {
         if !flags.contains(.option) {
             commitSelection()
         }
+    }
+
+    @discardableResult
+    private func handleKeyDown(_ event: NSEvent) -> Bool {
+        guard isSwitching, event.keyCode == UInt16(kVK_Escape) else {
+            return false
+        }
+
+        cancelSelection()
+        return true
     }
 
     private func showOrAdvance(direction: Int) {
@@ -277,12 +309,10 @@ final class OptionTabSwitcher {
 
             let targetSize = thumbnailTargetSize(for: window)
             let thumbnail = thumbnailProvider.placeholderThumbnail(for: window, targetSize: targetSize)
-            let appName = app.localizedName ?? window.ownerName
             let icon = app.icon ?? NSImage(named: NSImage.applicationIconName) ?? AppIconFactory.appIcon(size: 64)
 
             return OptionTabItem(
                 window: window,
-                appName: appName,
                 appIcon: icon,
                 thumbnail: thumbnail,
                 thumbnailSize: targetSize
@@ -351,9 +381,12 @@ final class OptionTabSwitcher {
     }
 
     private func thumbnailTargetSize(for window: WindowInfo) -> CGSize {
-        let height: CGFloat = max(96, min(128, CGFloat(settings.thumbnailHeight) * 0.68))
+        let cardScale: CGFloat = 1.15
+        let baseHeight: CGFloat = max(96, min(128, CGFloat(settings.thumbnailHeight) * 0.68))
+        let height = baseHeight * cardScale
         let aspect = window.bounds.height > 0 ? window.bounds.width / window.bounds.height : 1.6
-        let width = max(148, min(240, height * aspect))
+        let baseWidth = max(148, min(240, baseHeight * aspect))
+        let width = baseWidth * cardScale
         return CGSize(width: width, height: height)
     }
 }
@@ -599,17 +632,16 @@ private final class OptionTabCardView: NSView {
     }
 
     private enum Metrics {
-        static let horizontalPadding: CGFloat = 8
-        static let verticalPadding: CGFloat = 8
-        static let iconSize: CGFloat = 24
-        static let titleHeight: CGFloat = 34
-        static let thumbnailCornerRadius: CGFloat = 7
+        static let horizontalPadding: CGFloat = 9
+        static let verticalPadding: CGFloat = 9
+        static let iconSize: CGFloat = 28
+        static let titleHeight: CGFloat = 39
+        static let thumbnailCornerRadius: CGFloat = 8
     }
 
     private let item: OptionTabItem
     private let iconView = NSImageView()
     private let titleLabel = NSTextField(labelWithString: "")
-    private let appLabel = NSTextField(labelWithString: "")
     private let thumbnailView = NSImageView()
 
     init(item: OptionTabItem) {
@@ -629,8 +661,8 @@ private final class OptionTabCardView: NSView {
 
     static func preferredSize(for item: OptionTabItem) -> CGSize {
         CGSize(
-            width: max(168, item.thumbnailSize.width + Metrics.horizontalPadding * 2),
-            height: item.thumbnailSize.height + Metrics.verticalPadding * 2 + Metrics.titleHeight + 4
+            width: max(193, item.thumbnailSize.width + Metrics.horizontalPadding * 2),
+            height: item.thumbnailSize.height + Metrics.verticalPadding * 2 + Metrics.titleHeight
         )
     }
 
@@ -648,7 +680,7 @@ private final class OptionTabCardView: NSView {
 
     private func setupViews() {
         wantsLayer = true
-        layer?.cornerRadius = 13
+        layer?.cornerRadius = 15
         layer?.cornerCurve = .continuous
         layer?.borderWidth = 1
 
@@ -656,20 +688,12 @@ private final class OptionTabCardView: NSView {
         iconView.imageScaling = .scaleProportionallyUpOrDown
 
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        titleLabel.font = .systemFont(ofSize: 15, weight: .semibold)
         titleLabel.textColor = .white
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.maximumNumberOfLines = 1
         titleLabel.cell?.truncatesLastVisibleLine = true
         titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-
-        appLabel.translatesAutoresizingMaskIntoConstraints = false
-        appLabel.font = .systemFont(ofSize: 11, weight: .medium)
-        appLabel.textColor = NSColor.white.withAlphaComponent(0.62)
-        appLabel.lineBreakMode = .byTruncatingTail
-        appLabel.maximumNumberOfLines = 1
-        appLabel.cell?.truncatesLastVisibleLine = true
-        appLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         thumbnailView.translatesAutoresizingMaskIntoConstraints = false
         thumbnailView.imageScaling = .scaleProportionallyUpOrDown
@@ -680,15 +704,8 @@ private final class OptionTabCardView: NSView {
         thumbnailView.layer?.borderWidth = 1
         thumbnailView.layer?.borderColor = NSColor.white.withAlphaComponent(0.1).cgColor
 
-        let textStack = NSStackView(views: [titleLabel, appLabel])
-        textStack.translatesAutoresizingMaskIntoConstraints = false
-        textStack.orientation = .vertical
-        textStack.alignment = .leading
-        textStack.spacing = 2
-        textStack.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-
         addSubview(iconView)
-        addSubview(textStack)
+        addSubview(titleLabel)
         addSubview(thumbnailView)
 
         NSLayoutConstraint.activate([
@@ -697,9 +714,9 @@ private final class OptionTabCardView: NSView {
             iconView.widthAnchor.constraint(equalToConstant: Metrics.iconSize),
             iconView.heightAnchor.constraint(equalToConstant: Metrics.iconSize),
 
-            textStack.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 8),
-            textStack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Metrics.horizontalPadding),
-            textStack.centerYAnchor.constraint(equalTo: iconView.centerYAnchor),
+            titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 9),
+            titleLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Metrics.horizontalPadding),
+            titleLabel.centerYAnchor.constraint(equalTo: iconView.centerYAnchor),
 
             thumbnailView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Metrics.horizontalPadding),
             thumbnailView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Metrics.horizontalPadding),
@@ -712,7 +729,6 @@ private final class OptionTabCardView: NSView {
     private func configure() {
         iconView.image = item.appIcon
         titleLabel.stringValue = item.window.title
-        appLabel.stringValue = item.appName
         thumbnailView.image = item.thumbnail
         updateSelectionAppearance()
     }

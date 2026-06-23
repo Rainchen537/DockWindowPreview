@@ -2,6 +2,12 @@
 
 All notable Y-Dock release changes are tracked here.
 
+## v1.0.3 - 2026-06-23
+
+- Enlarged the `Option+Tab` switcher cards by 15% for easier scanning.
+- Removed the redundant app-name subtitle from switcher cards so each card keeps one clear window title.
+- Added `Esc` cancellation while the `Option+Tab` switcher is open, allowing users to back out without activating a window.
+
 ## v1.0.2 - 2026-06-23
 
 - Redesigned the `Option+Tab` switcher as a single acrylic panel containing independent rounded window cards.

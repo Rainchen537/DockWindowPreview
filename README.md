@@ -55,7 +55,7 @@
 3. 将 `Y-Dock.app` 拖到 `Applications`。
 4. 启动 `Y-Dock`，按提示开启权限。
 
-> 当前版本已使用 Developer ID 签名，但还没有 notarization。首次打开时如果 macOS 提示无法验证，请在 Finder 中右键 App，选择 **Open / 打开**。
+> 当前版本已使用 Developer ID 签名并通过 Apple notarization，首次打开不需要绕过 Gatekeeper。
 
 ## 🔑 权限说明
 
@@ -155,4 +155,3 @@ hover 卡片时的“只看当前窗口”效果是公开 API 下的视觉模拟
 - 多屏幕坐标修正。
 - 更漂亮的动效和 hover 过渡。
 - 自动更新。
-- Apple notarization。

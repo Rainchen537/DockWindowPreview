@@ -84,7 +84,7 @@ Check the built app:
 3. Update `README.md` release links.
 4. Update `CHANGELOG.md`.
 5. Build Debug and Release.
-6. Package a signed DMG.
+6. Package a signed, notarized, and stapled DMG.
 7. Commit, tag, push.
 8. Create a GitHub Release and upload the DMG.
 9. Optionally install the new app into `/Applications` for local verification.
@@ -94,13 +94,21 @@ Packaging commands, replacing `0.0.0` with the release version:
 ```sh
 APP="build/ReleaseDerivedData/Build/Products/Release/Y-Dock.app"
 STAGE="$(mktemp -d /tmp/Y-Dock-v0.0.0.XXXXXX)"
+SIGN_ID="Developer ID Application: Xingchen Li (A94225N8T5)"
+DMG="dist/Y-Dock-v0.0.0.dmg"
 ditto --noextattr --norsrc "$APP" "$STAGE/Y-Dock.app"
 ln -s /Applications "$STAGE/Applications"
 xattr -cr "$STAGE/Y-Dock.app"
-codesign --force --deep --options runtime --timestamp=none --sign "Developer ID Application: Xingchen Li (A94225N8T5)" "$STAGE/Y-Dock.app"
+codesign --force --deep --options runtime --timestamp --sign "$SIGN_ID" "$STAGE/Y-Dock.app"
 codesign --verify --deep --strict --verbose=2 "$STAGE/Y-Dock.app"
-hdiutil create -volname "Y-Dock v0.0.0" -srcfolder "$STAGE" -ov -format UDZO "dist/Y-Dock-v0.0.0.dmg"
-hdiutil verify "dist/Y-Dock-v0.0.0.dmg"
+hdiutil create -volname "Y-Dock v0.0.0" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
+hdiutil verify "$DMG"
+codesign --force --timestamp --sign "$SIGN_ID" "$DMG"
+codesign --verify --verbose=4 "$DMG"
+xcrun notarytool submit "$DMG" --keychain-profile y-dock-notary --wait
+xcrun stapler staple "$DMG"
+xcrun stapler validate "$DMG"
+spctl -a -vvv -t open --context context:primary-signature "$DMG"
 ```
 
 GitHub release with `gh`:

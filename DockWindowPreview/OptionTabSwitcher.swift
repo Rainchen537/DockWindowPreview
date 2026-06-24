@@ -778,6 +778,7 @@ private final class OptionTabCardView: NSView {
     init(item: OptionTabItem) {
         self.item = item
         super.init(frame: .zero)
+        lockPreferredSize()
         setupViews()
         configure()
     }
@@ -812,6 +813,20 @@ private final class OptionTabCardView: NSView {
 
     func updateThumbnail(_ image: NSImage) {
         thumbnailView.image = image
+    }
+
+    private func lockPreferredSize() {
+        let size = Self.preferredSize(for: item)
+        translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.required, for: .horizontal)
+        setContentHuggingPriority(.required, for: .vertical)
+        setContentCompressionResistancePriority(.required, for: .horizontal)
+        setContentCompressionResistancePriority(.required, for: .vertical)
+
+        NSLayoutConstraint.activate([
+            widthAnchor.constraint(equalToConstant: size.width),
+            heightAnchor.constraint(equalToConstant: size.height)
+        ])
     }
 
     private func setupViews() {

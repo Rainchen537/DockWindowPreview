@@ -2,6 +2,12 @@
 
 All notable Y-Dock release changes are tracked here.
 
+## v1.0.9 - 2026-06-24
+
+- Fixed `Option+Tab` switcher cards being stretched across the full panel by locking each card to its computed proportional thumbnail size.
+- Improved the Dock-to-preview hover protection path so the gap between the Dock and preview panel no longer schedules an early close when Dock hit-testing briefly fails.
+- Prepared a signed and notarized DMG for updating local installations.
+
 ## v1.0.8 - 2026-06-24
 
 - Fixed `Option+Tab` thumbnails preserving the wrong captured image aspect ratio, which could make narrow windows such as WeChat look flattened.

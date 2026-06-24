@@ -16,7 +16,7 @@ final class MouseTracker {
     private var currentHoverIdentity: String?
     private var lastHandledAt: TimeInterval = 0
     private let throttleInterval: TimeInterval = 0.035
-    private let leaveDelay: TimeInterval = 0.020
+    private let leaveDelay: TimeInterval = 0.120
 
     init(dockInspector: DockInspector, settings: AppSettings = .shared) {
         self.dockInspector = dockInspector
@@ -62,8 +62,9 @@ final class MouseTracker {
 
         let region = dockInspector.dockRegion(containing: point)
         let isInsideDockFrame = region?.frame.contains(point) == true
+        let isInsidePreviewProtection = isPointInsidePreviewPanel?(point) == true
 
-        if !isInsideDockFrame, isPointInsidePreviewPanel?(point) == true {
+        if !isInsideDockFrame, isInsidePreviewProtection {
             cancelPendingLeave()
             return
         }
@@ -73,6 +74,10 @@ final class MouseTracker {
         lastHandledAt = now
 
         guard let region, region.frame.insetBy(dx: -6, dy: -6).contains(point) else {
+            if isInsidePreviewProtection {
+                cancelPendingLeave()
+                return
+            }
             currentHoverIdentity = nil
             cancelPendingHover()
             scheduleLeave()
@@ -80,6 +85,10 @@ final class MouseTracker {
         }
 
         guard let item = dockInspector.dockItem(at: point, in: region), item.runningApplication != nil else {
+            if isInsidePreviewProtection {
+                cancelPendingLeave()
+                return
+            }
             currentHoverIdentity = nil
             cancelPendingHover()
             scheduleLeave()

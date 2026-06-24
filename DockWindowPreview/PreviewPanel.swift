@@ -18,7 +18,8 @@ private enum PreviewPanelLayout {
     static var controlTop: CGFloat { cardInset + (titleRowHeight - controlButtonSize) / 2 }
     static let controlMaskWidth: CGFloat = 90
     static var controlMaskHeight: CGFloat { cardInset + titleRowHeight }
-    static let dockBridgeInset: CGFloat = 18
+    static let dockBridgeInset: CGFloat = 28
+    static let dockBridgeAnchorSpan: CGFloat = 150
     static let focusPreviewDelay: TimeInterval = 0.05
 }
 
@@ -333,34 +334,49 @@ final class PreviewPanel: NSPanel {
 
     private func bridgeFrame(from anchor: NSPoint, dockEdge: DockEdge) -> NSRect {
         let inset = PreviewPanelLayout.dockBridgeInset
+        let anchorSpan = PreviewPanelLayout.dockBridgeAnchorSpan
+        let screen = NSScreen.screens.first { $0.frame.contains(anchor) }
+            ?? NSScreen.screens.first { $0.frame.intersects(frame) }
+            ?? NSScreen.main
+        let screenFrame = screen?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let visibleFrame = screen?.visibleFrame ?? screenFrame
 
         switch dockEdge {
         case .bottom:
-            let minY = min(anchor.y, frame.minY) - inset
-            let maxY = max(anchor.y, frame.minY) + inset
+            let dockTopY = visibleFrame.minY > screenFrame.minY + 20 ? visibleFrame.minY : anchor.y
+            let minX = min(frame.minX, anchor.x - anchorSpan / 2) - inset
+            let maxX = max(frame.maxX, anchor.x + anchorSpan / 2) + inset
+            let minY = min(dockTopY, frame.minY) - inset
+            let maxY = max(dockTopY, frame.minY) + inset
             return NSRect(
-                x: frame.minX - inset,
+                x: minX,
                 y: minY,
-                width: frame.width + inset * 2,
+                width: max(1, maxX - minX),
                 height: max(1, maxY - minY)
             )
         case .left:
-            let minX = min(anchor.x, frame.minX) - inset
-            let maxX = max(anchor.x, frame.minX) + inset
+            let dockRightX = visibleFrame.minX > screenFrame.minX + 20 ? visibleFrame.minX : anchor.x
+            let minX = min(dockRightX, frame.minX) - inset
+            let maxX = max(dockRightX, frame.minX) + inset
+            let minY = min(frame.minY, anchor.y - anchorSpan / 2) - inset
+            let maxY = max(frame.maxY, anchor.y + anchorSpan / 2) + inset
             return NSRect(
                 x: minX,
-                y: frame.minY - inset,
+                y: minY,
                 width: max(1, maxX - minX),
-                height: frame.height + inset * 2
+                height: max(1, maxY - minY)
             )
         case .right:
-            let minX = min(anchor.x, frame.maxX) - inset
-            let maxX = max(anchor.x, frame.maxX) + inset
+            let dockLeftX = visibleFrame.maxX < screenFrame.maxX - 20 ? visibleFrame.maxX : anchor.x
+            let minX = min(dockLeftX, frame.maxX) - inset
+            let maxX = max(dockLeftX, frame.maxX) + inset
+            let minY = min(frame.minY, anchor.y - anchorSpan / 2) - inset
+            let maxY = max(frame.maxY, anchor.y + anchorSpan / 2) + inset
             return NSRect(
                 x: minX,
-                y: frame.minY - inset,
+                y: minY,
                 width: max(1, maxX - minX),
-                height: frame.height + inset * 2
+                height: max(1, maxY - minY)
             )
         }
     }

@@ -507,8 +507,8 @@ final class OptionTabSwitcher {
         let baseHeight: CGFloat = max(96, min(128, CGFloat(settings.thumbnailHeight) * 0.68))
         let height = baseHeight * cardScale
         let aspect = window.bounds.height > 0 ? window.bounds.width / window.bounds.height : 1.6
-        let baseWidth = max(148, min(240, baseHeight * aspect))
-        let width = baseWidth * cardScale
+        let maxWidth = 240 * cardScale
+        let width = max(1, min(maxWidth, height * aspect))
         return CGSize(width: width, height: height)
     }
 }
@@ -764,7 +764,7 @@ private final class OptionTabCardView: NSView {
         static let titleHeight: CGFloat = 35
         static let cardCornerRadius: CGFloat = 17
         static let thumbnailCornerRadius: CGFloat = 9
-        static let minCardWidth: CGFloat = 212
+        static let compactTitleWidth: CGFloat = 92
         static let titleFontSize: CGFloat = 13.5
     }
 
@@ -772,6 +772,8 @@ private final class OptionTabCardView: NSView {
     private let iconView = NSImageView()
     private let titleLabel = NSTextField(labelWithString: "")
     private let thumbnailView = NSImageView()
+    private var expandedTitleLeadingConstraint: NSLayoutConstraint?
+    private var compactTitleLeadingConstraint: NSLayoutConstraint?
 
     init(item: OptionTabItem) {
         self.item = item
@@ -790,7 +792,7 @@ private final class OptionTabCardView: NSView {
 
     static func preferredSize(for item: OptionTabItem) -> CGSize {
         CGSize(
-            width: max(Metrics.minCardWidth, item.thumbnailSize.width),
+            width: item.thumbnailSize.width,
             height: item.thumbnailSize.height + Metrics.titleHeight
         )
     }
@@ -801,6 +803,11 @@ private final class OptionTabCardView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         onClick?()
+    }
+
+    override func layout() {
+        super.layout()
+        updateTitleLayoutForCurrentWidth()
     }
 
     func updateThumbnail(_ image: NSImage) {
@@ -837,14 +844,20 @@ private final class OptionTabCardView: NSView {
         addSubview(titleLabel)
         addSubview(thumbnailView)
 
+        let expandedTitleLeadingConstraint = titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: Metrics.titleGap)
+        let compactTitleLeadingConstraint = titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Metrics.titleHorizontalPadding)
+        compactTitleLeadingConstraint.isActive = false
+        self.expandedTitleLeadingConstraint = expandedTitleLeadingConstraint
+        self.compactTitleLeadingConstraint = compactTitleLeadingConstraint
+
         NSLayoutConstraint.activate([
             iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Metrics.titleHorizontalPadding),
             iconView.centerYAnchor.constraint(equalTo: topAnchor, constant: Metrics.titleHeight / 2),
             iconView.widthAnchor.constraint(equalToConstant: Metrics.iconSize),
             iconView.heightAnchor.constraint(equalToConstant: Metrics.iconSize),
 
-            titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: Metrics.titleGap),
-            titleLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Metrics.titleHorizontalPadding),
+            expandedTitleLeadingConstraint,
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -Metrics.titleHorizontalPadding),
             titleLabel.centerYAnchor.constraint(equalTo: iconView.centerYAnchor),
 
             thumbnailView.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -860,6 +873,15 @@ private final class OptionTabCardView: NSView {
         titleLabel.stringValue = item.window.title
         thumbnailView.image = item.thumbnail
         updateSelectionAppearance()
+    }
+
+    private func updateTitleLayoutForCurrentWidth() {
+        let useCompactTitle = bounds.width < Metrics.compactTitleWidth
+        guard iconView.isHidden != useCompactTitle else { return }
+
+        iconView.isHidden = useCompactTitle
+        expandedTitleLeadingConstraint?.isActive = !useCompactTitle
+        compactTitleLeadingConstraint?.isActive = useCompactTitle
     }
 
     private func updateSelectionAppearance() {

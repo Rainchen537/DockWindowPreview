@@ -2,6 +2,12 @@
 
 All notable Y-Dock release changes are tracked here.
 
+## v1.0.7 - 2026-06-24
+
+- Added a wider Dock-to-preview hover protection bridge so moving from the Dock into the preview panel no longer closes the panel through the visual gap.
+- Removed the fixed minimum width from `Option+Tab` window cards so narrow windows keep their proportional scaled width at the shared thumbnail height.
+- Prepared a signed DMG for updating local installations.
+
 ## v1.0.6 - 2026-06-24
 
 - Replaced the menu bar status icon with a simpler line-only template icon.

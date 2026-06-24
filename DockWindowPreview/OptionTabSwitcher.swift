@@ -34,15 +34,24 @@ final class OptionTabSwitcher {
     private var localFlagsMonitor: Any?
     private var globalKeyMonitor: Any?
     private var localKeyMonitor: Any?
+    private var globalKeyUpMonitor: Any?
+    private var localKeyUpMonitor: Any?
+    private var globalMouseMonitor: Any?
+    private var localMouseMonitor: Any?
     private var isStarted = false
     private var isSwitching = false
     private var items: [OptionTabItem] = []
     private var selectedIndex = 0
     private var sessionID = 0
+    private var tabRepeatTimer: Timer?
+    private var nextTabRepeatTime: CFTimeInterval = 0
+    private var tabRepeatDirection = 1
 
     private let collectorQueue = DispatchQueue(label: "com.ydock.option-tab.collector", qos: .userInitiated)
     private let thumbnailQueue = DispatchQueue(label: "com.ydock.option-tab.thumbnails", qos: .userInitiated)
     private let hotKeySignature = OSType(UInt32(bigEndian: 0x59444F43)) // "YDCK"
+    private let tabRepeatInitialDelay: TimeInterval = 0.36
+    private let tabRepeatInterval: TimeInterval = 0.11
 
     init(
         windowCollector: WindowCollector,
@@ -90,6 +99,18 @@ final class OptionTabSwitcher {
         if let localKeyMonitor {
             NSEvent.removeMonitor(localKeyMonitor)
         }
+        if let globalKeyUpMonitor {
+            NSEvent.removeMonitor(globalKeyUpMonitor)
+        }
+        if let localKeyUpMonitor {
+            NSEvent.removeMonitor(localKeyUpMonitor)
+        }
+        if let globalMouseMonitor {
+            NSEvent.removeMonitor(globalMouseMonitor)
+        }
+        if let localMouseMonitor {
+            NSEvent.removeMonitor(localMouseMonitor)
+        }
 
         forwardHotKey = nil
         backwardHotKey = nil
@@ -98,6 +119,10 @@ final class OptionTabSwitcher {
         localFlagsMonitor = nil
         globalKeyMonitor = nil
         localKeyMonitor = nil
+        globalKeyUpMonitor = nil
+        localKeyUpMonitor = nil
+        globalMouseMonitor = nil
+        localMouseMonitor = nil
         isStarted = false
     }
 
@@ -201,14 +226,47 @@ final class OptionTabSwitcher {
             }
             return event
         }
+
+        globalKeyUpMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyUp) { [weak self] event in
+            DispatchQueue.main.async {
+                self?.handleKeyUp(event)
+            }
+        }
+
+        localKeyUpMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyUp) { [weak self] event in
+            if self?.handleKeyUp(event) == true {
+                return nil
+            }
+            return event
+        }
+
+        let mouseMask: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: mouseMask) { [weak self] _ in
+            DispatchQueue.main.async {
+                _ = self?.handleMouseDown()
+            }
+        }
+
+        localMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: mouseMask) { [weak self] event in
+            if self?.handleMouseDown() == true {
+                return nil
+            }
+            return event
+        }
     }
 
     private func handleHotKey(id: UInt32) {
         switch HotKeyID(rawValue: id) {
         case .forward:
             showOrAdvance(direction: 1)
+            if isSwitching {
+                beginTabRepeat(direction: 1)
+            }
         case .backward:
             showOrAdvance(direction: -1)
+            if isSwitching {
+                beginTabRepeat(direction: -1)
+            }
         case .none:
             break
         }
@@ -226,6 +284,25 @@ final class OptionTabSwitcher {
         guard isSwitching, event.keyCode == UInt16(kVK_Escape) else {
             return false
         }
+
+        cancelSelection()
+        return true
+    }
+
+    @discardableResult
+    private func handleKeyUp(_ event: NSEvent) -> Bool {
+        guard isSwitching, event.keyCode == UInt16(kVK_Tab) else {
+            return false
+        }
+
+        stopTabRepeat()
+        return true
+    }
+
+    @discardableResult
+    private func handleMouseDown() -> Bool {
+        guard isSwitching else { return false }
+        guard !panel.containsScreenPoint(NSEvent.mouseLocation) else { return false }
 
         cancelSelection()
         return true
@@ -296,10 +373,49 @@ final class OptionTabSwitcher {
 
     private func resetState() {
         sessionID += 1
+        stopTabRepeat()
         panel.hide()
         isSwitching = false
         items = []
         selectedIndex = 0
+    }
+
+    private func beginTabRepeat(direction: Int) {
+        tabRepeatDirection = direction
+        nextTabRepeatTime = CACurrentMediaTime() + tabRepeatInitialDelay
+
+        guard tabRepeatTimer == nil else { return }
+        let timer = Timer(timeInterval: 0.04, repeats: true) { [weak self] _ in
+            self?.tickTabRepeat()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        tabRepeatTimer = timer
+    }
+
+    private func tickTabRepeat() {
+        guard isSwitching else {
+            stopTabRepeat()
+            return
+        }
+        guard CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(kVK_Tab)) else {
+            stopTabRepeat()
+            return
+        }
+        guard NSEvent.modifierFlags.contains(.option) else {
+            stopTabRepeat()
+            return
+        }
+
+        let now = CACurrentMediaTime()
+        guard now >= nextTabRepeatTime else { return }
+
+        moveSelection(direction: tabRepeatDirection)
+        nextTabRepeatTime = now + tabRepeatInterval
+    }
+
+    private func stopTabRepeat() {
+        tabRepeatTimer?.invalidate()
+        tabRepeatTimer = nil
     }
 
     private func makeItems(from windows: [WindowInfo]) -> [OptionTabItem] {
@@ -309,7 +425,12 @@ final class OptionTabSwitcher {
             }
 
             let targetSize = thumbnailTargetSize(for: window)
-            let thumbnail = thumbnailProvider.placeholderThumbnail(for: window, targetSize: targetSize)
+            let placeholderReason = window.isMinimized ? "已最小化" : "正在载入"
+            let thumbnail = thumbnailProvider.placeholderThumbnail(
+                for: window,
+                targetSize: targetSize,
+                reason: placeholderReason
+            )
             let icon = app.icon ?? NSImage(named: NSImage.applicationIconName) ?? AppIconFactory.appIcon(size: 64)
 
             return OptionTabItem(
@@ -382,7 +503,7 @@ final class OptionTabSwitcher {
     }
 
     private func thumbnailTargetSize(for window: WindowInfo) -> CGSize {
-        let cardScale: CGFloat = 1.50
+        let cardScale: CGFloat = 1.265
         let baseHeight: CGFloat = max(96, min(128, CGFloat(settings.thumbnailHeight) * 0.68))
         let height = baseHeight * cardScale
         let aspect = window.bounds.height > 0 ? window.bounds.width / window.bounds.height : 1.6
@@ -396,13 +517,13 @@ private final class OptionTabPanel: NSPanel {
     var onClickItem: ((Int) -> Void)?
 
     private enum Metrics {
-        static let outerPadding: CGFloat = 24
-        static let cardGap: CGFloat = 18
-        static let rowGap: CGFloat = 18
-        static let minPanelWidth: CGFloat = 460
-        static let maxScreenWidthRatio: CGFloat = 0.8
-        static let maxPanelHeightInset: CGFloat = 110
-        static let panelCornerRadius: CGFloat = 28
+        static let outerPadding: CGFloat = 22
+        static let cardGap: CGFloat = 15
+        static let rowGap: CGFloat = 15
+        static let minPanelWidth: CGFloat = 396
+        static let maxScreenWidthRatio: CGFloat = 0.9
+        static let maxPanelHeightInset: CGFloat = 125
+        static let panelCornerRadius: CGFloat = 26
     }
 
     private let backgroundView = NSVisualEffectView()
@@ -458,6 +579,10 @@ private final class OptionTabPanel: NSPanel {
     func updateThumbnail(_ image: NSImage, for windowID: CGWindowID) {
         guard let card = cardViews.first(where: { $0.windowID == windowID }) else { return }
         card.updateThumbnail(image)
+    }
+
+    func containsScreenPoint(_ point: NSPoint) -> Bool {
+        frame.contains(point)
     }
 
     private func setupViews() {
@@ -633,13 +758,14 @@ private final class OptionTabCardView: NSView {
     }
 
     private enum Metrics {
-        static let horizontalPadding: CGFloat = 12
-        static let verticalPadding: CGFloat = 12
-        static let iconSize: CGFloat = 36
-        static let titleGap: CGFloat = 12
-        static let titleHeight: CGFloat = 51
-        static let cardCornerRadius: CGFloat = 20
-        static let thumbnailCornerRadius: CGFloat = 10
+        static let titleHorizontalPadding: CGFloat = 8
+        static let iconSize: CGFloat = 25
+        static let titleGap: CGFloat = 8
+        static let titleHeight: CGFloat = 35
+        static let cardCornerRadius: CGFloat = 17
+        static let thumbnailCornerRadius: CGFloat = 9
+        static let minCardWidth: CGFloat = 212
+        static let titleFontSize: CGFloat = 13.5
     }
 
     private let item: OptionTabItem
@@ -664,8 +790,8 @@ private final class OptionTabCardView: NSView {
 
     static func preferredSize(for item: OptionTabItem) -> CGSize {
         CGSize(
-            width: max(251, item.thumbnailSize.width + Metrics.horizontalPadding * 2),
-            height: item.thumbnailSize.height + Metrics.verticalPadding * 2 + Metrics.titleHeight
+            width: max(Metrics.minCardWidth, item.thumbnailSize.width),
+            height: item.thumbnailSize.height + Metrics.titleHeight
         )
     }
 
@@ -691,7 +817,7 @@ private final class OptionTabCardView: NSView {
         iconView.imageScaling = .scaleProportionallyUpOrDown
 
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.font = .systemFont(ofSize: 20, weight: .semibold)
+        titleLabel.font = .systemFont(ofSize: Metrics.titleFontSize, weight: .semibold)
         titleLabel.textColor = .white
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.maximumNumberOfLines = 1
@@ -712,20 +838,20 @@ private final class OptionTabCardView: NSView {
         addSubview(thumbnailView)
 
         NSLayoutConstraint.activate([
-            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Metrics.horizontalPadding),
-            iconView.topAnchor.constraint(equalTo: topAnchor, constant: Metrics.verticalPadding),
+            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Metrics.titleHorizontalPadding),
+            iconView.centerYAnchor.constraint(equalTo: topAnchor, constant: Metrics.titleHeight / 2),
             iconView.widthAnchor.constraint(equalToConstant: Metrics.iconSize),
             iconView.heightAnchor.constraint(equalToConstant: Metrics.iconSize),
 
             titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: Metrics.titleGap),
-            titleLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Metrics.horizontalPadding),
+            titleLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Metrics.titleHorizontalPadding),
             titleLabel.centerYAnchor.constraint(equalTo: iconView.centerYAnchor),
 
-            thumbnailView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Metrics.horizontalPadding),
-            thumbnailView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Metrics.horizontalPadding),
-            thumbnailView.topAnchor.constraint(equalTo: topAnchor, constant: Metrics.verticalPadding + Metrics.titleHeight),
+            thumbnailView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            thumbnailView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            thumbnailView.topAnchor.constraint(equalTo: topAnchor, constant: Metrics.titleHeight),
             thumbnailView.heightAnchor.constraint(equalToConstant: item.thumbnailSize.height),
-            thumbnailView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Metrics.verticalPadding)
+            thumbnailView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
     }
 

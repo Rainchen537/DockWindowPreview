@@ -2,6 +2,15 @@
 
 All notable Y-Dock release changes are tracked here.
 
+## v1.0.5 - 2026-06-24
+
+- Resized the `Option+Tab` switcher back toward the `v1.0.3` scale, keeping it only 10% larger than that baseline.
+- Increased the `Option+Tab` panel wrapping width from 80% to 90% of the current screen.
+- Added held-Tab repeat cycling while `Option+Tab` is open, with `Tab` release stopping the repeat.
+- Added outside-click cancellation for the `Option+Tab` switcher without activating a window.
+- Tightened switcher card layout so thumbnails sit flush to the left, right, and bottom edges while the title row is smaller.
+- Improved minimized-window first-frame placeholders in the switcher so minimized items are visibly marked before cached thumbnails load.
+
 ## v1.0.4 - 2026-06-24
 
 - Enlarged the `Option+Tab` switcher cards and acrylic panel by another 30% for easier window recognition.

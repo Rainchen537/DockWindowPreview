@@ -2,6 +2,12 @@
 
 All notable Y-Dock release changes are tracked here.
 
+## v1.0.6 - 2026-06-24
+
+- Replaced the menu bar status icon with a simpler line-only template icon.
+- Kept the icon taller and more balanced at small menu bar sizes.
+- Prepared a signed DMG for updating local installations.
+
 ## v1.0.5 - 2026-06-24
 
 - Resized the `Option+Tab` switcher back toward the `v1.0.3` scale, keeping it only 10% larger than that baseline.

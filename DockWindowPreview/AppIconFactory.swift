@@ -100,45 +100,46 @@ enum AppIconFactory {
     }
 
     static func statusBarIcon() -> NSImage {
-        let image = NSImage(size: NSSize(width: 19, height: 18))
+        let image = NSImage(size: NSSize(width: 20, height: 20))
         image.lockFocus()
 
-        let stroke = NSColor.black
-        let softFill = NSColor.black.withAlphaComponent(0.18)
-        let strongFill = NSColor.black.withAlphaComponent(0.92)
-        stroke.setStroke()
+        func strokedPath(alpha: CGFloat, lineWidth: CGFloat) -> NSBezierPath {
+            let path = NSBezierPath()
+            path.lineWidth = lineWidth
+            path.lineCapStyle = .round
+            path.lineJoinStyle = .round
+            NSColor.black.withAlphaComponent(alpha).setStroke()
+            return path
+        }
 
-        let back = NSBezierPath(roundedRect: NSRect(x: 6.2, y: 7.6, width: 9.4, height: 6.6), xRadius: 2.1, yRadius: 2.1)
-        back.lineWidth = 1.25
-        stroke.withAlphaComponent(0.46).setStroke()
-        back.stroke()
+        let rearWindow = NSBezierPath(roundedRect: NSRect(x: 7.0, y: 8.8, width: 8.6, height: 6.8), xRadius: 2.1, yRadius: 2.1)
+        rearWindow.lineWidth = 1.35
+        rearWindow.lineJoinStyle = .round
+        NSColor.black.withAlphaComponent(0.42).setStroke()
+        rearWindow.stroke()
 
-        let middle = NSBezierPath(roundedRect: NSRect(x: 4.8, y: 6.4, width: 10.2, height: 7.4), xRadius: 2.25, yRadius: 2.25)
-        middle.lineWidth = 1.25
-        stroke.withAlphaComponent(0.68).setStroke()
-        middle.stroke()
+        let frontWindow = NSBezierPath(roundedRect: NSRect(x: 3.2, y: 5.2, width: 12.6, height: 9.8), xRadius: 2.8, yRadius: 2.8)
+        frontWindow.lineWidth = 1.65
+        frontWindow.lineJoinStyle = .round
+        NSColor.black.setStroke()
+        frontWindow.stroke()
 
-        let front = NSBezierPath(roundedRect: NSRect(x: 3.2, y: 5.0, width: 10.8, height: 8.1), xRadius: 2.4, yRadius: 2.4)
-        stroke.setStroke()
-        front.lineWidth = 1.55
-        front.stroke()
+        let titleLine = strokedPath(alpha: 0.92, lineWidth: 1.45)
+        titleLine.move(to: NSPoint(x: 5.8, y: 12.4))
+        titleLine.line(to: NSPoint(x: 13.1, y: 12.4))
+        titleLine.stroke()
 
-        softFill.setFill()
-        let previewBlock = NSBezierPath(roundedRect: NSRect(x: 5.2, y: 7.2, width: 3.2, height: 3.1), xRadius: 0.9, yRadius: 0.9)
-        previewBlock.fill()
+        let previewLine = strokedPath(alpha: 0.76, lineWidth: 1.35)
+        previewLine.move(to: NSPoint(x: 5.8, y: 9.6))
+        previewLine.line(to: NSPoint(x: 10.7, y: 9.6))
+        previewLine.move(to: NSPoint(x: 5.8, y: 7.3))
+        previewLine.line(to: NSPoint(x: 12.0, y: 7.3))
+        previewLine.stroke()
 
-        strongFill.setFill()
-        let titleLine = NSBezierPath(roundedRect: NSRect(x: 9.3, y: 9.3, width: 2.9, height: 1.15), xRadius: 0.55, yRadius: 0.55)
-        titleLine.fill()
-
-        let secondLine = NSBezierPath(roundedRect: NSRect(x: 9.3, y: 7.0, width: 2.35, height: 1.05), xRadius: 0.5, yRadius: 0.5)
-        secondLine.fill()
-
-        let dock = NSBezierPath(roundedRect: NSRect(x: 3.0, y: 2.0, width: 12.8, height: 2.25), xRadius: 1.1, yRadius: 1.1)
-        dock.fill()
-
-        let indicator = NSBezierPath(ovalIn: NSRect(x: 8.7, y: 0.8, width: 1.5, height: 1.5))
-        indicator.fill()
+        let dockLine = strokedPath(alpha: 0.95, lineWidth: 1.7)
+        dockLine.move(to: NSPoint(x: 4.4, y: 2.7))
+        dockLine.line(to: NSPoint(x: 15.6, y: 2.7))
+        dockLine.stroke()
 
         image.unlockFocus()
         image.isTemplate = true

@@ -108,21 +108,21 @@ enum AppIconFactory {
         let windowShape = NSBezierPath()
         windowShape.windingRule = .evenOdd
         windowShape.appendRoundedRect(
-            NSRect(x: 3.4, y: 5.0, width: 13.2, height: 11.4),
-            xRadius: 3.4,
-            yRadius: 3.4
+            NSRect(x: 2.4, y: 4.4, width: 15.2, height: 12.6),
+            xRadius: 3.8,
+            yRadius: 3.8
         )
         windowShape.appendRoundedRect(
-            NSRect(x: 6.3, y: 8.1, width: 7.4, height: 5.0),
-            xRadius: 1.6,
-            yRadius: 1.6
+            NSRect(x: 5.4, y: 7.8, width: 9.2, height: 5.6),
+            xRadius: 1.8,
+            yRadius: 1.8
         )
         windowShape.fill()
 
         let dockBase = NSBezierPath(
-            roundedRect: NSRect(x: 5.3, y: 2.8, width: 9.4, height: 1.9),
-            xRadius: 0.95,
-            yRadius: 0.95
+            roundedRect: NSRect(x: 4.0, y: 2.5, width: 12.0, height: 2.1),
+            xRadius: 1.05,
+            yRadius: 1.05
         )
         dockBase.fill()
 

@@ -2,6 +2,11 @@
 
 All notable Y-Dock release changes are tracked here.
 
+## v1.1.2 - 2026-06-25
+
+- Made Dock hover preview cards use near-opaque adaptive gray or white backgrounds so window names stay readable on bright desktops.
+- Added a subtle AppKit visual-effect backdrop behind Dock hover preview cards without letting the desktop content bleed through the title row.
+
 ## v1.1.1 - 2026-06-25
 
 - Reworked `Option+Tab` ordering to follow the Windows Alt+Tab model more closely: visible windows keep current front-to-back Z-order, while minimized windows stay behind visible windows and use focus history only as a fallback.

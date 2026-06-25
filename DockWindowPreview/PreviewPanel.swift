@@ -21,10 +21,48 @@ private enum PreviewPanelLayout {
     static let dockBridgeInset: CGFloat = 28
     static let dockBridgeAnchorSpan: CGFloat = 150
     static let focusPreviewDelay: TimeInterval = 0.05
-    static let cardBackgroundColor = NSColor(calibratedWhite: 0.03, alpha: 0.78)
-    static let cardBorderColor = NSColor(calibratedWhite: 1, alpha: 0.24)
-    static let cardHoverBackgroundColor = NSColor(calibratedRed: 0.16, green: 0.32, blue: 0.68, alpha: 0.42)
-    static let cardHoverBorderColor = NSColor(calibratedRed: 0.55, green: 0.72, blue: 1, alpha: 0.86)
+    static func isDarkAppearance(_ appearance: NSAppearance) -> Bool {
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+    }
+
+    static func cardBackgroundColor(for appearance: NSAppearance) -> NSColor {
+        if isDarkAppearance(appearance) {
+            return NSColor(calibratedWhite: 0.10, alpha: 0.97)
+        }
+        return NSColor(calibratedWhite: 0.94, alpha: 0.98)
+    }
+
+    static func cardBorderColor(for appearance: NSAppearance) -> NSColor {
+        if isDarkAppearance(appearance) {
+            return NSColor(calibratedWhite: 1, alpha: 0.30)
+        }
+        return NSColor(calibratedWhite: 0, alpha: 0.22)
+    }
+
+    static func cardHoverBackgroundColor(for appearance: NSAppearance) -> NSColor {
+        if isDarkAppearance(appearance) {
+            return NSColor(calibratedRed: 0.16, green: 0.25, blue: 0.42, alpha: 0.98)
+        }
+        return NSColor(calibratedRed: 0.82, green: 0.89, blue: 1.0, alpha: 0.98)
+    }
+
+    static func cardHoverBorderColor(for appearance: NSAppearance) -> NSColor {
+        if isDarkAppearance(appearance) {
+            return NSColor(calibratedRed: 0.45, green: 0.63, blue: 1, alpha: 0.86)
+        }
+        return NSColor(calibratedRed: 0.10, green: 0.34, blue: 0.78, alpha: 0.58)
+    }
+
+    static func titleTextColor(for appearance: NSAppearance) -> NSColor {
+        if isDarkAppearance(appearance) {
+            return NSColor(calibratedWhite: 0.96, alpha: 1)
+        }
+        return NSColor(calibratedWhite: 0.08, alpha: 1)
+    }
+
+    static func cardMaterial(for appearance: NSAppearance) -> NSVisualEffectView.Material {
+        isDarkAppearance(appearance) ? .hudWindow : .popover
+    }
 }
 
 final class PreviewPanel: NSPanel {
@@ -558,11 +596,13 @@ private final class WindowPreviewCardView: NSView {
     var joinedPosition: PreviewJoinedCardPosition = .single {
         didSet {
             layer?.maskedCorners = joinedPosition.maskedCorners
+            backgroundEffectView.layer?.maskedCorners = joinedPosition.maskedCorners
             imageView.layer?.maskedCorners = joinedPosition.maskedCorners
         }
     }
 
     private let windowInfo: WindowInfo
+    private let backgroundEffectView = PreviewCardEffectView()
     private let iconView = NSImageView()
     private let imageView = NSImageView()
     private let titleLabel = NSTextField(labelWithString: "")
@@ -573,6 +613,7 @@ private final class WindowPreviewCardView: NSView {
     private lazy var minimizeButton = PreviewControlButton(kind: .minimizeWindow, target: self, action: #selector(minimizeButtonClicked))
     private let thumbnailSize: NSSize
     private let settings: AppSettings
+    private var isHovered = false
 
     init(window: WindowInfo, appIcon: NSImage?, thumbnail: NSImage, thumbnailSize: NSSize, settings: AppSettings) {
         self.windowInfo = window
@@ -584,11 +625,12 @@ private final class WindowPreviewCardView: NSView {
         layer?.cornerRadius = 12
         layer?.cornerCurve = .continuous
         layer?.maskedCorners = joinedPosition.maskedCorners
-        layer?.backgroundColor = PreviewPanelLayout.cardBackgroundColor.cgColor
+        layer?.masksToBounds = true
         layer?.borderWidth = 1
-        layer?.borderColor = PreviewPanelLayout.cardBorderColor.cgColor
 
+        setupBackdrop()
         setupViews(appIcon: appIcon, thumbnail: thumbnail)
+        applyCurrentAppearance()
     }
 
     required init?(coder: NSCoder) {
@@ -623,15 +665,20 @@ private final class WindowPreviewCardView: NSView {
     }
 
     override func mouseEntered(with event: NSEvent) {
-        layer?.backgroundColor = PreviewPanelLayout.cardHoverBackgroundColor.cgColor
-        layer?.borderColor = PreviewPanelLayout.cardHoverBorderColor.cgColor
+        isHovered = true
+        applyCurrentAppearance()
         setControlButtonsVisible(true)
     }
 
     override func mouseExited(with event: NSEvent) {
-        layer?.backgroundColor = PreviewPanelLayout.cardBackgroundColor.cgColor
-        layer?.borderColor = PreviewPanelLayout.cardBorderColor.cgColor
+        isHovered = false
+        applyCurrentAppearance()
         setControlButtonsVisible(false)
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        applyCurrentAppearance()
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -663,6 +710,37 @@ private final class WindowPreviewCardView: NSView {
     @objc private func minimizeButtonClicked() {
         setControlButtonsVisible(false)
         onMinimize?(windowInfo)
+    }
+
+    private func setupBackdrop() {
+        backgroundEffectView.blendingMode = .behindWindow
+        backgroundEffectView.state = .active
+        backgroundEffectView.alphaValue = 0.18
+        backgroundEffectView.translatesAutoresizingMaskIntoConstraints = false
+        backgroundEffectView.wantsLayer = true
+        backgroundEffectView.layer?.cornerRadius = 12
+        backgroundEffectView.layer?.cornerCurve = .continuous
+        backgroundEffectView.layer?.maskedCorners = joinedPosition.maskedCorners
+        addSubview(backgroundEffectView)
+
+        NSLayoutConstraint.activate([
+            backgroundEffectView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            backgroundEffectView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            backgroundEffectView.topAnchor.constraint(equalTo: topAnchor),
+            backgroundEffectView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+    }
+
+    private func applyCurrentAppearance() {
+        let appearance = effectiveAppearance
+        backgroundEffectView.material = PreviewPanelLayout.cardMaterial(for: appearance)
+        layer?.backgroundColor = (isHovered
+            ? PreviewPanelLayout.cardHoverBackgroundColor(for: appearance)
+            : PreviewPanelLayout.cardBackgroundColor(for: appearance)).cgColor
+        layer?.borderColor = (isHovered
+            ? PreviewPanelLayout.cardHoverBorderColor(for: appearance)
+            : PreviewPanelLayout.cardBorderColor(for: appearance)).cgColor
+        titleLabel.textColor = PreviewPanelLayout.titleTextColor(for: appearance)
     }
 
     private func setupViews(appIcon: NSImage?, thumbnail: NSImage) {
@@ -702,7 +780,6 @@ private final class WindowPreviewCardView: NSView {
 
             titleLabel.stringValue = windowInfo.title
             titleLabel.font = NSFont.systemFont(ofSize: PreviewPanelLayout.titleFontSize, weight: .semibold)
-            titleLabel.textColor = NSColor(calibratedWhite: 0.94, alpha: 1)
             titleLabel.lineBreakMode = .byTruncatingTail
             titleLabel.maximumNumberOfLines = 1
             titleLabel.alignment = .left
@@ -750,6 +827,12 @@ private final class WindowPreviewCardView: NSView {
             controlStack.topAnchor.constraint(equalTo: topAnchor, constant: PreviewPanelLayout.controlTop)
         ])
         setControlButtonsVisible(false)
+    }
+}
+
+private final class PreviewCardEffectView: NSVisualEffectView {
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
     }
 }
 

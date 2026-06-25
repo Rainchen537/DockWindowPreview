@@ -12,14 +12,17 @@ private struct OptionTabItem {
 private final class WindowFocusHistory {
     private struct Entry {
         let ownerPID: pid_t
+        let windowID: CGWindowID?
         let titleKey: String
         let roundedWidth: Int
         let roundedHeight: Int
         let isWindowSpecific: Bool
-        let sequence: UInt64
 
         func matches(_ window: WindowInfo) -> Bool {
             guard ownerPID == window.ownerPID else { return false }
+            if let windowID, windowID == window.windowID {
+                return true
+            }
             guard isWindowSpecific else { return true }
 
             let windowTitleKey = Self.normalizedTitle(window.title)
@@ -32,31 +35,43 @@ private final class WindowFocusHistory {
 
         func isSameWindow(as other: Entry) -> Bool {
             ownerPID == other.ownerPID
+                && windowID == other.windowID
                 && titleKey == other.titleKey
                 && roundedWidth == other.roundedWidth
                 && roundedHeight == other.roundedHeight
                 && isWindowSpecific == other.isWindowSpecific
         }
 
-        static func app(ownerPID: pid_t, sequence: UInt64) -> Entry {
+        static func app(ownerPID: pid_t) -> Entry {
             Entry(
                 ownerPID: ownerPID,
+                windowID: nil,
                 titleKey: "",
                 roundedWidth: 0,
                 roundedHeight: 0,
-                isWindowSpecific: false,
-                sequence: sequence
+                isWindowSpecific: false
             )
         }
 
-        static func window(ownerPID: pid_t, title: String, bounds: CGRect, sequence: UInt64) -> Entry {
+        static func window(_ window: WindowInfo) -> Entry {
+            Entry(
+                ownerPID: window.ownerPID,
+                windowID: window.windowID,
+                titleKey: normalizedTitle(window.title),
+                roundedWidth: roundedDimension(window.bounds.width),
+                roundedHeight: roundedDimension(window.bounds.height),
+                isWindowSpecific: true
+            )
+        }
+
+        static func window(ownerPID: pid_t, title: String, bounds: CGRect) -> Entry {
             Entry(
                 ownerPID: ownerPID,
+                windowID: nil,
                 titleKey: normalizedTitle(title),
                 roundedWidth: roundedDimension(bounds.width),
                 roundedHeight: roundedDimension(bounds.height),
-                isWindowSpecific: true,
-                sequence: sequence
+                isWindowSpecific: true
             )
         }
 
@@ -73,7 +88,6 @@ private final class WindowFocusHistory {
     }
 
     private var entries: [Entry] = []
-    private var sequence: UInt64 = 0
     private var activationObserver: NSObjectProtocol?
     private var pollTimer: Timer?
     private let maximumEntries = 80
@@ -114,10 +128,24 @@ private final class WindowFocusHistory {
         recordCurrentFocus(includeWindow: false)
     }
 
-    func sorted(_ windows: [WindowInfo]) -> [WindowInfo] {
-        guard !entries.isEmpty, windows.count > 1 else { return windows }
+    func recordVisibleZOrder(_ windows: [WindowInfo]) {
+        for window in windows.reversed() where !window.isMinimized {
+            remember(Entry.window(window))
+        }
+    }
 
-        return windows.enumerated().sorted { lhs, rhs in
+    func noteSelectedWindow(_ window: WindowInfo) {
+        remember(Entry.window(window))
+    }
+
+    func windowsInAltTabOrder(_ windows: [WindowInfo]) -> [WindowInfo] {
+        let visibleWindows = windows.filter { !$0.isMinimized }
+        let minimizedWindows = windows.filter(\.isMinimized)
+        guard !minimizedWindows.isEmpty else {
+            return visibleWindows
+        }
+
+        let sortedMinimized = minimizedWindows.enumerated().sorted { lhs, rhs in
             let leftRank = rank(for: lhs.element)
             let rightRank = rank(for: rhs.element)
             if leftRank != rightRank {
@@ -125,6 +153,8 @@ private final class WindowFocusHistory {
             }
             return lhs.offset < rhs.offset
         }.map(\.element)
+
+        return visibleWindows + sortedMinimized
     }
 
     private func rank(for window: WindowInfo) -> Int {
@@ -151,7 +181,7 @@ private final class WindowFocusHistory {
             return
         }
 
-        remember(nextEntry { Entry.app(ownerPID: app.processIdentifier, sequence: $0) })
+        remember(Entry.app(ownerPID: app.processIdentifier))
     }
 
     private func focusedWindowEntry(for app: NSRunningApplication) -> Entry? {
@@ -172,19 +202,11 @@ private final class WindowFocusHistory {
             return nil
         }
 
-        return nextEntry {
-            Entry.window(
-                ownerPID: app.processIdentifier,
-                title: title,
-                bounds: bounds,
-                sequence: $0
-            )
-        }
-    }
-
-    private func nextEntry(_ makeEntry: (UInt64) -> Entry) -> Entry {
-        sequence &+= 1
-        return makeEntry(sequence)
+        return Entry.window(
+            ownerPID: app.processIdentifier,
+            title: title,
+            bounds: bounds
+        )
     }
 
     private func remember(_ entry: Entry) {
@@ -545,9 +567,14 @@ final class OptionTabSwitcher {
         // Keep the hotkey path short: show visible windows immediately, then let
         // the background expansion add minimized windows if Accessibility allows.
         focusHistory.recordCurrentApplication()
-        var windows = focusHistory.sorted(windowCollector.switchableWindows(includeMinimized: false))
+        let visibleWindows = windowCollector.switchableWindows(includeMinimized: false)
+        focusHistory.recordVisibleZOrder(visibleWindows)
+
+        var windows = focusHistory.windowsInAltTabOrder(visibleWindows)
         if windows.isEmpty, AXIsProcessTrusted() {
-            windows = focusHistory.sorted(windowCollector.switchableWindows(includeMinimized: true))
+            let expandedWindows = windowCollector.switchableWindows(includeMinimized: true)
+            focusHistory.recordVisibleZOrder(expandedWindows)
+            windows = focusHistory.windowsInAltTabOrder(expandedWindows)
         }
         guard !windows.isEmpty else {
             NSSound.beep()
@@ -590,6 +617,7 @@ final class OptionTabSwitcher {
         }
 
         let window = items[index].window
+        focusHistory.noteSelectedWindow(window)
         resetState()
         windowActivator.activate(window)
     }
@@ -708,7 +736,8 @@ final class OptionTabSwitcher {
                     return
                 }
 
-                let windows = self.focusHistory.sorted(collectedWindows)
+                self.focusHistory.recordVisibleZOrder(collectedWindows)
+                let windows = self.focusHistory.windowsInAltTabOrder(collectedWindows)
                 let currentIDs = self.items.map(\.window.windowID)
                 let nextIDs = windows.map(\.windowID)
                 guard currentIDs != nextIDs else { return }

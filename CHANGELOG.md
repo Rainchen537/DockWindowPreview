@@ -2,6 +2,13 @@
 
 All notable Y-Dock release changes are tracked here.
 
+## v1.1.1 - 2026-06-25
+
+- Reworked `Option+Tab` ordering to follow the Windows Alt+Tab model more closely: visible windows keep current front-to-back Z-order, while minimized windows stay behind visible windows and use focus history only as a fallback.
+- Darkened Dock hover preview card backgrounds and borders so their outer edges remain visible on bright or busy desktops.
+- Increased the Dock hover preview title row by about 20% for more legible window names.
+- Prepared a signed and notarized DMG for updating local installations.
+
 ## v1.1.0 - 2026-06-25
 
 - Changed `Option+Tab` ordering to follow recent focus history, so pressing it once returns to the previously focused window.

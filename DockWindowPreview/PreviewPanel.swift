@@ -8,10 +8,10 @@ private enum PreviewPanelLayout {
     static let cardSpacing: CGFloat = 0
     static let cardInset: CGFloat = 4
     static let titleImageSpacing: CGFloat = 2
-    static let titleRowHeight: CGFloat = 24
+    static let titleRowHeight: CGFloat = 29
     static let titleBandHeight: CGFloat = titleRowHeight + titleImageSpacing
-    static let titleFontSize: CGFloat = 13.4
-    static let titleIconSize: CGFloat = 20
+    static let titleFontSize: CGFloat = 14
+    static let titleIconSize: CGFloat = 22
     static let controlButtonSize: CGFloat = 16.5
     static let controlSpacing: CGFloat = 6.5
     static let controlLeading: CGFloat = 8
@@ -21,6 +21,10 @@ private enum PreviewPanelLayout {
     static let dockBridgeInset: CGFloat = 28
     static let dockBridgeAnchorSpan: CGFloat = 150
     static let focusPreviewDelay: TimeInterval = 0.05
+    static let cardBackgroundColor = NSColor(calibratedWhite: 0.03, alpha: 0.78)
+    static let cardBorderColor = NSColor(calibratedWhite: 1, alpha: 0.24)
+    static let cardHoverBackgroundColor = NSColor(calibratedRed: 0.16, green: 0.32, blue: 0.68, alpha: 0.42)
+    static let cardHoverBorderColor = NSColor(calibratedRed: 0.55, green: 0.72, blue: 1, alpha: 0.86)
 }
 
 final class PreviewPanel: NSPanel {
@@ -580,9 +584,9 @@ private final class WindowPreviewCardView: NSView {
         layer?.cornerRadius = 12
         layer?.cornerCurve = .continuous
         layer?.maskedCorners = joinedPosition.maskedCorners
-        layer?.backgroundColor = NSColor(calibratedWhite: 1, alpha: 0.06).cgColor
+        layer?.backgroundColor = PreviewPanelLayout.cardBackgroundColor.cgColor
         layer?.borderWidth = 1
-        layer?.borderColor = NSColor(calibratedWhite: 1, alpha: 0.10).cgColor
+        layer?.borderColor = PreviewPanelLayout.cardBorderColor.cgColor
 
         setupViews(appIcon: appIcon, thumbnail: thumbnail)
     }
@@ -619,14 +623,14 @@ private final class WindowPreviewCardView: NSView {
     }
 
     override func mouseEntered(with event: NSEvent) {
-        layer?.backgroundColor = NSColor(calibratedRed: 0.25, green: 0.47, blue: 0.95, alpha: 0.26).cgColor
-        layer?.borderColor = NSColor(calibratedRed: 0.45, green: 0.65, blue: 1, alpha: 0.70).cgColor
+        layer?.backgroundColor = PreviewPanelLayout.cardHoverBackgroundColor.cgColor
+        layer?.borderColor = PreviewPanelLayout.cardHoverBorderColor.cgColor
         setControlButtonsVisible(true)
     }
 
     override func mouseExited(with event: NSEvent) {
-        layer?.backgroundColor = NSColor(calibratedWhite: 1, alpha: 0.06).cgColor
-        layer?.borderColor = NSColor(calibratedWhite: 1, alpha: 0.10).cgColor
+        layer?.backgroundColor = PreviewPanelLayout.cardBackgroundColor.cgColor
+        layer?.borderColor = PreviewPanelLayout.cardBorderColor.cgColor
         setControlButtonsVisible(false)
     }
 

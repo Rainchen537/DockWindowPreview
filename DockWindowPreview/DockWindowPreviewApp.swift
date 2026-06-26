@@ -34,6 +34,16 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
     private let previewPrewarmQueue = DispatchQueue(label: "com.ydock.preview-prewarm", qos: .utility)
     private var previewPrewarmWorkItem: DispatchWorkItem?
     private var previewPrewarmIdentity: String?
+    private var isDockContextMenuProtectionActive = false
+    private var dockContextMenuProtectionStartedAt: TimeInterval?
+    private var dockContextMenuProtectionAnchor: NSPoint?
+    private var didObserveDockContextMenuWindow = false
+    private var shouldEndDockContextMenuProtectionWhenUnobserved = false
+    private var dockContextMenuProtectionWorkItem: DispatchWorkItem?
+    private let dockContextMenuMinimumProtectionDuration: TimeInterval = 0.65
+    private let dockContextMenuFallbackProtectionDuration: TimeInterval = 2.4
+    private let dockContextMenuMaximumProtectionDuration: TimeInterval = 12.0
+    private let dockContextMenuProtectionPollInterval: TimeInterval = 0.12
 
     private lazy var previewPanel: PreviewPanel = {
         let panel = PreviewPanel(thumbnailProvider: thumbnailProvider, settings: settings)
@@ -74,10 +84,11 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
             self?.previewPanel.hide()
             self?.previewContext = nil
         }
-        tracker.onSecondaryClickInDock = { [weak self] in
-            self?.cancelPreviewPrewarm()
-            self?.previewPanel.hide()
-            self?.previewContext = nil
+        tracker.onDockContextMenuTrackingBegan = { [weak self] point in
+            self?.beginDockContextMenuProtection(at: point)
+        }
+        tracker.onDockContextMenuInteractionEnded = { [weak self] in
+            self?.endDockContextMenuProtectionAfterMenuCloses()
         }
         return tracker
     }()
@@ -108,6 +119,7 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         cancelPreviewPrewarm()
+        cancelDockContextMenuProtectionTimer()
         optionTabSwitcher.stop()
         mouseTracker.stop()
     }
@@ -217,8 +229,92 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
             return
         }
 
+        guard !isDockContextMenuProtectionActive || previewPanel.isVisible else {
+            return
+        }
+
         previewContext = PreviewContext(appPID: app.processIdentifier, anchor: anchor, dockEdge: dockItem.dockEdge)
         previewPanel.show(windows: windows, app: app, anchor: anchor, dockEdge: dockItem.dockEdge)
+    }
+
+    private func beginDockContextMenuProtection(at point: NSPoint) {
+        isDockContextMenuProtectionActive = true
+        dockContextMenuProtectionStartedAt = Date.timeIntervalSinceReferenceDate
+        dockContextMenuProtectionAnchor = point
+        didObserveDockContextMenuWindow = false
+        shouldEndDockContextMenuProtectionWhenUnobserved = false
+        previewPanel.setDockContextMenuDeferralActive(true)
+        scheduleDockContextMenuProtectionCheck(after: dockContextMenuProtectionPollInterval)
+    }
+
+    private func endDockContextMenuProtectionAfterMenuCloses() {
+        guard isDockContextMenuProtectionActive else { return }
+
+        let elapsed = Date.timeIntervalSinceReferenceDate - (dockContextMenuProtectionStartedAt ?? 0)
+        let delay = max(0.08, dockContextMenuMinimumProtectionDuration - elapsed)
+        shouldEndDockContextMenuProtectionWhenUnobserved = true
+        scheduleDockContextMenuProtectionCheck(after: delay)
+    }
+
+    private func scheduleDockContextMenuProtectionCheck(after delay: TimeInterval) {
+        cancelDockContextMenuProtectionTimer()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.checkDockContextMenuProtection()
+        }
+        dockContextMenuProtectionWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+    }
+
+    private func checkDockContextMenuProtection() {
+        guard
+            isDockContextMenuProtectionActive,
+            let startedAt = dockContextMenuProtectionStartedAt
+        else {
+            return
+        }
+
+        let elapsed = Date.timeIntervalSinceReferenceDate - startedAt
+        let menuVisible = dockContextMenuProtectionAnchor.map {
+            dockInspector.isDockContextMenuLikelyVisible(near: $0)
+        } ?? false
+
+        didObserveDockContextMenuWindow = didObserveDockContextMenuWindow || menuVisible
+
+        if elapsed >= dockContextMenuMaximumProtectionDuration {
+            endDockContextMenuProtection()
+            return
+        }
+
+        if elapsed < dockContextMenuMinimumProtectionDuration || menuVisible {
+            scheduleDockContextMenuProtectionCheck(after: dockContextMenuProtectionPollInterval)
+            return
+        }
+
+        if shouldEndDockContextMenuProtectionWhenUnobserved || didObserveDockContextMenuWindow || elapsed >= dockContextMenuFallbackProtectionDuration {
+            endDockContextMenuProtection()
+            return
+        }
+
+        scheduleDockContextMenuProtectionCheck(after: dockContextMenuProtectionPollInterval)
+    }
+
+    private func endDockContextMenuProtection() {
+        guard isDockContextMenuProtectionActive else { return }
+
+        cancelDockContextMenuProtectionTimer()
+        isDockContextMenuProtectionActive = false
+        dockContextMenuProtectionStartedAt = nil
+        dockContextMenuProtectionAnchor = nil
+        didObserveDockContextMenuWindow = false
+        shouldEndDockContextMenuProtectionWhenUnobserved = false
+        previewPanel.setDockContextMenuDeferralActive(false)
+        mouseTracker.refreshCurrentHover()
+    }
+
+    private func cancelDockContextMenuProtectionTimer() {
+        dockContextMenuProtectionWorkItem?.cancel()
+        dockContextMenuProtectionWorkItem = nil
     }
 
     private func schedulePreviewPrewarm(for dockItem: DockItem) {

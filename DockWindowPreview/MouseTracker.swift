@@ -5,7 +5,8 @@ final class MouseTracker {
     var onHoverResolved: ((DockItem, NSPoint) -> Void)?
     var onDockHoverCandidateChanged: ((DockItem, Bool) -> Void)?
     var onMouseLeftDockAndPreview: (() -> Void)?
-    var onSecondaryClickInDock: (() -> Void)?
+    var onDockContextMenuTrackingBegan: ((NSPoint) -> Void)?
+    var onDockContextMenuInteractionEnded: (() -> Void)?
     var isPointInsidePreviewPanel: ((NSPoint) -> Bool)?
 
     private let dockInspector: DockInspector
@@ -32,7 +33,10 @@ final class MouseTracker {
             .leftMouseDragged,
             .rightMouseDragged,
             .otherMouseDragged,
-            .rightMouseDown
+            .rightMouseDown,
+            .leftMouseDown,
+            .otherMouseDown,
+            .keyDown
         ]
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] event in
             self?.handleMouseEvent(event)
@@ -62,36 +66,44 @@ final class MouseTracker {
     private func handleMouseEvent(_ event: NSEvent) {
         switch event.type {
         case .rightMouseDown:
-            handleSecondaryMouseDown(at: NSEvent.mouseLocation)
+            if !handleSecondaryMouseDown(at: NSEvent.mouseLocation) {
+                onDockContextMenuInteractionEnded?()
+            }
+        case .leftMouseDown, .otherMouseDown, .keyDown:
+            onDockContextMenuInteractionEnded?()
         default:
             handleMouseMove(at: NSEvent.mouseLocation)
         }
     }
 
-    private func handleSecondaryMouseDown(at point: NSPoint) {
+    func refreshCurrentHover() {
+        handleMouseMove(at: NSEvent.mouseLocation, forceHoverResolution: true)
+    }
+
+    @discardableResult
+    private func handleSecondaryMouseDown(at point: NSPoint) -> Bool {
         if !Thread.isMainThread {
             DispatchQueue.main.async { [weak self] in
                 self?.handleSecondaryMouseDown(at: point)
             }
-            return
+            return true
         }
 
         guard let region = dockInspector.dockRegion(containing: point),
               region.frame.insetBy(dx: -6, dy: -6).contains(point)
         else {
-            return
+            return false
         }
 
-        currentHoverIdentity = nil
-        cancelPendingHover()
         cancelPendingLeave()
-        onSecondaryClickInDock?()
+        onDockContextMenuTrackingBegan?(point)
+        return true
     }
 
-    private func handleMouseMove(at point: NSPoint) {
+    private func handleMouseMove(at point: NSPoint, forceHoverResolution: Bool = false) {
         if !Thread.isMainThread {
             DispatchQueue.main.async { [weak self] in
-                self?.handleMouseMove(at: point)
+                self?.handleMouseMove(at: point, forceHoverResolution: forceHoverResolution)
             }
             return
         }
@@ -106,7 +118,7 @@ final class MouseTracker {
         }
 
         let now = Date.timeIntervalSinceReferenceDate
-        guard now - lastHandledAt >= throttleInterval else { return }
+        guard forceHoverResolution || now - lastHandledAt >= throttleInterval else { return }
         lastHandledAt = now
 
         guard let region, region.frame.insetBy(dx: -6, dy: -6).contains(point) else {
@@ -132,7 +144,14 @@ final class MouseTracker {
         }
 
         cancelPendingLeave()
-        guard currentHoverIdentity != item.identity else { return }
+        if currentHoverIdentity == item.identity {
+            if forceHoverResolution {
+                cancelPendingHover()
+                onHoverResolved?(item, point)
+            }
+            return
+        }
+
         let hadPreviousHoverIdentity = currentHoverIdentity != nil
         currentHoverIdentity = item.identity
         onDockHoverCandidateChanged?(item, hadPreviousHoverIdentity)

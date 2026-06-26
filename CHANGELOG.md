@@ -2,6 +2,11 @@
 
 All notable Y-Dock release changes are tracked here.
 
+## v1.1.6 - 2026-06-27
+
+- Kept Dock hover state intact when right-clicking Dock icons, while temporarily deferring the preview panel below the Dock context menu.
+- Restored the preview panel's normal level after the Dock context menu closes, so app-name tooltip coverage still works during regular hover.
+
 ## v1.1.5 - 2026-06-27
 
 - Hide the Dock hover preview immediately when right-clicking in the Dock so the system Dock context menu is not covered.

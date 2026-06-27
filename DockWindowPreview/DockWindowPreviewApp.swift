@@ -37,12 +37,9 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
     private var isDockContextMenuProtectionActive = false
     private var dockContextMenuProtectionStartedAt: TimeInterval?
     private var dockContextMenuProtectionAnchor: NSPoint?
-    private var didObserveDockContextMenuWindow = false
-    private var shouldEndDockContextMenuProtectionWhenUnobserved = false
+    private var shouldEndDockContextMenuProtectionWhenMenuCloses = false
     private var dockContextMenuProtectionWorkItem: DispatchWorkItem?
     private let dockContextMenuMinimumProtectionDuration: TimeInterval = 0.65
-    private let dockContextMenuFallbackProtectionDuration: TimeInterval = 2.4
-    private let dockContextMenuMaximumProtectionDuration: TimeInterval = 12.0
     private let dockContextMenuProtectionPollInterval: TimeInterval = 0.12
 
     private lazy var previewPanel: PreviewPanel = {
@@ -241,8 +238,7 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
         isDockContextMenuProtectionActive = true
         dockContextMenuProtectionStartedAt = Date.timeIntervalSinceReferenceDate
         dockContextMenuProtectionAnchor = point
-        didObserveDockContextMenuWindow = false
-        shouldEndDockContextMenuProtectionWhenUnobserved = false
+        shouldEndDockContextMenuProtectionWhenMenuCloses = false
         previewPanel.setDockContextMenuDeferralActive(true)
         scheduleDockContextMenuProtectionCheck(after: dockContextMenuProtectionPollInterval)
     }
@@ -252,7 +248,7 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
 
         let elapsed = Date.timeIntervalSinceReferenceDate - (dockContextMenuProtectionStartedAt ?? 0)
         let delay = max(0.08, dockContextMenuMinimumProtectionDuration - elapsed)
-        shouldEndDockContextMenuProtectionWhenUnobserved = true
+        shouldEndDockContextMenuProtectionWhenMenuCloses = true
         scheduleDockContextMenuProtectionCheck(after: delay)
     }
 
@@ -279,19 +275,12 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
             dockInspector.isDockContextMenuLikelyVisible(near: $0)
         } ?? false
 
-        didObserveDockContextMenuWindow = didObserveDockContextMenuWindow || menuVisible
-
-        if elapsed >= dockContextMenuMaximumProtectionDuration {
-            endDockContextMenuProtection()
-            return
-        }
-
         if elapsed < dockContextMenuMinimumProtectionDuration || menuVisible {
             scheduleDockContextMenuProtectionCheck(after: dockContextMenuProtectionPollInterval)
             return
         }
 
-        if shouldEndDockContextMenuProtectionWhenUnobserved || didObserveDockContextMenuWindow || elapsed >= dockContextMenuFallbackProtectionDuration {
+        if shouldEndDockContextMenuProtectionWhenMenuCloses {
             endDockContextMenuProtection()
             return
         }
@@ -306,8 +295,7 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
         isDockContextMenuProtectionActive = false
         dockContextMenuProtectionStartedAt = nil
         dockContextMenuProtectionAnchor = nil
-        didObserveDockContextMenuWindow = false
-        shouldEndDockContextMenuProtectionWhenUnobserved = false
+        shouldEndDockContextMenuProtectionWhenMenuCloses = false
         previewPanel.setDockContextMenuDeferralActive(false)
         mouseTracker.refreshCurrentHover()
     }

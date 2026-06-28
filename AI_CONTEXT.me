@@ -1,0 +1,169 @@
+# Y-Dock AI_CONTEXT
+
+本文件是 Y-Dock 的项目级 AI 维护说明。先阅读根目录的 `../Y_PROJECT_APP_STANDARD.me`，再阅读本文件、`CHANGELOG.me`、`CHANGELOG.md` 和 `README.md`。
+
+## 通用规范
+
+- 遵守 `../Y_PROJECT_APP_STANDARD.me` 的 Y-Project 通用规范。
+- 每次功能、修复、发布或发布事故处理后，追加更新到 `CHANGELOG.me`。
+- 用户可见 release 必须同步更新 `CHANGELOG.md` 和 GitHub Release。
+- 发布 DMG 必须签名、公证、staple，并在本机安装验证。
+- 优先通过 GitHub MCP / GitHub App 创建 GitHub Release 和上传 DMG；不可用时再用 `gh` CLI 或 GitHub Releases REST API。
+
+## Product Summary
+
+Y-Dock is a lightweight macOS menu bar utility that mimics the Windows taskbar multi-window preview experience for the macOS Dock. The GitHub repository and Xcode scheme are still named `DockWindowPreview`.
+
+Core behavior:
+
+- Runs as a menu bar/background app only. It should not appear in Dock or Cmd-Tab.
+- Watches global mouse movement and performs best-effort Dock icon hit testing through Accessibility.
+- Shows an AppKit `NSPanel` preview near Dock icons with one card per window.
+- Registers `Option+Tab` with public Carbon hotkey APIs for a Windows-style window switcher.
+- Keeps preview UI lightweight: show panels quickly, then fill thumbnails from background queues where possible.
+- Uses different preview layouts by context: Dock hover previews use compact joined cards, while `Option+Tab` uses a single acrylic switcher panel with independent rounded cards and centered wrapping rows.
+- `Option+Tab` cards intentionally show only the window title. Do not add a repeated app-name subtitle; `Esc` cancels the active switcher without activating a window.
+- `Option+Tab` keeps cycling while Tab is physically held, stops repeat on Tab release, commits on Option release, and cancels when the user clicks outside the switcher panel.
+- `Option+Tab` should include minimized windows in the initial list when Accessibility is trusted. Avoid title/size-only de-duping for minimized windows because separate browser or document windows often share similar metadata.
+- Uses CoreGraphics window lists and snapshots for thumbnails.
+- Uses Accessibility to raise, focus, minimize, close, restore minimized windows, or terminate the owning app.
+- Uses public APIs only. macOS does not expose a public Dock hover/window-preview API.
+
+## Important Files
+
+- `DockWindowPreview/main.swift`: app bootstrap.
+- `DockWindowPreview/DockWindowPreviewApp.swift`: app delegate, menu bar item, popover, trackers, update checks, cache coordination.
+- `DockWindowPreview/MouseTracker.swift`: global mouse movement monitor, hover delay, leave delay.
+- `DockWindowPreview/DockInspector.swift`: best-effort Dock area and Dock icon inspection.
+- `DockWindowPreview/WindowCollector.swift`: `CGWindowListCopyWindowInfo` enumeration and filtering.
+- `DockWindowPreview/WindowThumbnailProvider.swift`: thumbnail capture, cache, and fallback thumbnails.
+- `DockWindowPreview/PreviewPanel.swift`: AppKit preview panel UI and card interactions.
+- `DockWindowPreview/FocusOverlayPanel.swift`: lightweight visual focus overlay for hovered thumbnails.
+- `DockWindowPreview/OptionTabSwitcher.swift`: global `Option+Tab` hotkey, centered switcher panel, and selection lifecycle.
+- `DockWindowPreview/WindowActivator.swift`: AX-based focus, raise, close, minimize, restore.
+- `DockWindowPreview/SettingsWindow.swift`: independent settings window business controller, using `Y-Framework/Setting` for the shared settings shell and controls.
+- `Y-Framework/Setting/YSettingsFramework.swift`: vendored copy of the shared Y-Project settings framework, kept in this repository so GitHub source checkouts build independently.
+- `DockWindowPreview/AppIcon.icns`: bundled app icon.
+- `assets/readme/logo*.png`: GitHub README logo assets.
+- `README.md`: public project page.
+- `CHANGELOG.md`: user-facing release history.
+- `CHANGELOG.me`: AI/maintenance update log.
+- `AI_MAINTENANCE.me`: legacy AI file kept as a pointer to this file.
+- `release.sh`: Release build, Developer ID signing, notarized/stapled DMG packaging, and Gatekeeper verification.
+
+## App Identity
+
+Do not change these unless explicitly requested:
+
+- Bundle identifier: `com.lixingchen.DockWindowPreview`
+- Display name: `Y-Dock`
+- Deployment target: macOS 13+
+- App mode: `LSUIElement = true`
+- GitHub repository: `https://github.com/Rainchen537/DockWindowPreview`
+- Xcode project/scheme naming: `DockWindowPreview`
+
+The app icon is currently a raw `.icns` resource referenced by `CFBundleIconFile = AppIcon`. If changing the logo, regenerate `DockWindowPreview/AppIcon.icns` and update the README logo asset/link. Keep the visible icon artwork inset inside the 1024 canvas; a full-bleed rounded square looks oversized in Launchpad.
+
+## Build Verification
+
+The Xcode target must include `Y-Framework/Setting/YSettingsFramework.swift` in Sources. Use these before release:
+
+```sh
+xcodebuild -project DockWindowPreview.xcodeproj \
+  -scheme DockWindowPreview \
+  -configuration Debug \
+  -derivedDataPath build/VerifyDerivedData \
+  CODE_SIGNING_ALLOWED=NO \
+  build
+
+xcodebuild -project DockWindowPreview.xcodeproj \
+  -scheme DockWindowPreview \
+  -configuration Release \
+  -derivedDataPath build/ReleaseDerivedData \
+  CODE_SIGNING_ALLOWED=NO \
+  build
+```
+
+Check the built app:
+
+```sh
+/usr/libexec/PlistBuddy -c "Print :LSUIElement" build/ReleaseDerivedData/Build/Products/Release/Y-Dock.app/Contents/Info.plist
+/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" build/ReleaseDerivedData/Build/Products/Release/Y-Dock.app/Contents/Info.plist
+/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" build/ReleaseDerivedData/Build/Products/Release/Y-Dock.app/Contents/Info.plist
+```
+
+## Release Flow
+
+1. Choose the next version.
+2. Bump `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `DockWindowPreview.xcodeproj/project.pbxproj`.
+3. Update `README.md` release links.
+4. Update `CHANGELOG.md`.
+5. Update `AI_CONTEXT.me` if process or project assumptions changed.
+6. Update `CHANGELOG.me` with the maintenance record.
+7. Build Debug and Release.
+8. Package a signed, notarized, and stapled DMG.
+9. Commit, tag, push.
+10. Create a GitHub Release through GitHub MCP / GitHub App and upload the DMG.
+11. Optionally install the new app into `/Applications` for local verification; for release-grade changes, local install verification is expected.
+
+Packaging can be run through:
+
+```sh
+./release.sh
+```
+
+The older manual equivalent, replacing `0.0.0` with the release version:
+
+```sh
+APP="build/ReleaseDerivedData/Build/Products/Release/Y-Dock.app"
+STAGE="$(mktemp -d /tmp/Y-Dock-v0.0.0.XXXXXX)"
+SIGN_ID="Developer ID Application: Xingchen Li (A94225N8T5)"
+DMG="dist/Y-Dock-v0.0.0.dmg"
+ditto --noextattr --norsrc "$APP" "$STAGE/Y-Dock.app"
+ln -s /Applications "$STAGE/Applications"
+xattr -cr "$STAGE/Y-Dock.app"
+codesign --force --deep --options runtime --timestamp --sign "$SIGN_ID" "$STAGE/Y-Dock.app"
+codesign --verify --deep --strict --verbose=2 "$STAGE/Y-Dock.app"
+hdiutil create -volname "Y-Dock v0.0.0" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
+hdiutil verify "$DMG"
+codesign --force --timestamp --sign "$SIGN_ID" "$DMG"
+codesign --verify --verbose=4 "$DMG"
+xcrun notarytool submit "$DMG" --keychain-profile y-dock-notary --wait
+xcrun stapler staple "$DMG"
+xcrun stapler validate "$DMG"
+spctl -a -vvv -t open --context context:primary-signature "$DMG"
+```
+
+GitHub release with GitHub MCP / GitHub App is preferred. If unavailable, use `gh`:
+
+```sh
+git add README.md CHANGELOG.md AI_CONTEXT.me CHANGELOG.me DockWindowPreview.xcodeproj/project.pbxproj DockWindowPreview/AppIcon.icns assets/readme/logo.png assets/readme/logo-v0.0.0.png
+git commit -m "Release v0.0.0"
+git tag v0.0.0
+git push origin master
+git push origin v0.0.0
+gh release create v0.0.0 "dist/Y-Dock-v0.0.0.dmg" --title "Y-Dock v0.0.0" --notes-file build/release-notes-v0.0.0.txt
+```
+
+If `gh` is unavailable, use the GitHub Releases REST API with the existing repo remote (`Rainchen537/DockWindowPreview`) and upload the same DMG asset. Do not skip updating `CHANGELOG.md`; README links and release notes should match the tag.
+
+## Local Install Check
+
+```sh
+pkill -x Y-Dock
+ditto "$STAGE/Y-Dock.app" /Applications/Y-Dock.app
+codesign --verify --deep --strict --verbose=2 /Applications/Y-Dock.app
+open -a /Applications/Y-Dock.app
+```
+
+Launchpad and Finder can cache app icons for existing bundle identifiers. If the installed icon does not visually refresh immediately, verify the app bundle contains the new `AppIcon.icns`; macOS may update the displayed icon after Dock/Finder cache refresh or reboot.
+
+## Cautions
+
+- Avoid private APIs.
+- Keep UI work on the main thread.
+- Keep expensive thumbnail capture/prewarming away from mouse and hotkey event handlers.
+- Keep mouse tracking throttled and cancellable.
+- Do not rewrite Dock/window matching unless the user explicitly asks; it is intentionally best-effort because macOS does not expose stable public Dock hover metadata.
+- Do not reintroduce a menu bar popover for the settings page; complex settings now live in the shared independent settings window.
+- When touching `Option+Tab`, verify cancel/commit behavior carefully: `Esc` cancels, outside click cancels, Option release commits, Tab repeat stops on Tab release.

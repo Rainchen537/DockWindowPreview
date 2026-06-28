@@ -25,7 +25,7 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem?
     private var statusMenu: NSMenu?
-    private var settingsPopoverController: SettingsPopoverController?
+    private var settingsWindowController: SettingsWindowController?
     private var previewContext: PreviewContext?
     private var previewWindowCache: [pid_t: CachedPreviewWindows] = [:]
     private let previewWindowCacheTTL: TimeInterval = 1.6
@@ -149,43 +149,27 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
             button.image = AppIconFactory.statusBarIcon()
             button.imagePosition = .imageOnly
             button.imageScaling = .scaleProportionallyDown
-            button.toolTip = "\(AppBranding.displayName)：点击打开设置"
-            button.target = self
-            button.action = #selector(statusItemClicked(_:))
-            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            button.toolTip = AppBranding.displayName
         }
 
         statusMenu = makeStatusMenu()
+        item.menu = statusMenu
         statusItem = item
     }
 
     private func makeStatusMenu() -> NSMenu {
-        let menu = NSMenu()
-        menu.addItem(menuItem(title: "设置", action: #selector(openSettings), keyEquivalent: ","))
-        menu.addItem(menuItem(title: "请求隐私权限", action: #selector(requestPrivacyPermissions)))
-        menu.addItem(menuItem(title: "打开 Accessibility 权限", action: #selector(openAccessibilitySettings)))
-        menu.addItem(menuItem(title: "打开屏幕录制权限", action: #selector(openScreenCaptureSettings)))
-        menu.addItem(menuItem(title: "GitHub", action: #selector(openGitHub)))
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(menuItem(title: "退出", action: #selector(quit), keyEquivalent: "q"))
-        return menu
+        YProjectStatusMenu.make(
+            target: self,
+            openSettingsAction: #selector(openSettings),
+            quitAction: #selector(quit),
+            appName: AppBranding.displayName
+        )
     }
 
     private func menuItem(title: String, action: Selector, keyEquivalent: String = "") -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: keyEquivalent)
         item.target = self
         return item
-    }
-
-    @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
-        let event = NSApp.currentEvent
-        let shouldShowMenu = event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true
-
-        if shouldShowMenu {
-            showStatusMenu(from: sender)
-        } else {
-            toggleSettingsPopover(relativeTo: sender, requestPermissions: true)
-        }
     }
 
     @discardableResult
@@ -195,15 +179,10 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
         guard arguments.contains("--show-status-menu") else { return false }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
-            NSLog("[\(AppBranding.displayName)] showing settings popover")
-            self?.showSettingsPopover(requestPermissions: false)
+            NSLog("[\(AppBranding.displayName)] showing settings window")
+            self?.showSettingsWindow(requestPermissions: false)
         }
         return true
-    }
-
-    private func showStatusMenu(from button: NSStatusBarButton) {
-        settingsPopoverController?.close()
-        statusMenu?.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.minY), in: button)
     }
 
     private func showPreview(for dockItem: DockItem, anchor: NSPoint) {
@@ -412,30 +391,18 @@ final class DockWindowPreviewApp: NSObject, NSApplicationDelegate {
     }
 
     private func openSettingsAndRequestPermissions() {
-        showSettingsPopover(requestPermissions: true)
+        showSettingsWindow(requestPermissions: true)
     }
 
-    private func toggleSettingsPopover(relativeTo button: NSStatusBarButton, requestPermissions: Bool) {
-        if settingsPopoverController == nil {
-            settingsPopoverController = SettingsPopoverController(
+    private func showSettingsWindow(requestPermissions: Bool) {
+        if settingsWindowController == nil {
+            settingsWindowController = SettingsWindowController(
                 settings: settings,
                 permissionsManager: permissionsManager,
                 updateChecker: updateChecker
             )
         }
-        settingsPopoverController?.toggle(relativeTo: button, requestPermissions: requestPermissions)
-    }
-
-    private func showSettingsPopover(requestPermissions: Bool) {
-        guard let button = statusItem?.button else { return }
-        if settingsPopoverController == nil {
-            settingsPopoverController = SettingsPopoverController(
-                settings: settings,
-                permissionsManager: permissionsManager,
-                updateChecker: updateChecker
-            )
-        }
-        settingsPopoverController?.show(relativeTo: button, requestPermissions: requestPermissions)
+        settingsWindowController?.show(requestPermissions: requestPermissions)
     }
 
     private func scheduleStartupUpdateCheck() {

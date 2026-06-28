@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Rainchen537/DockWindowPreview/releases/tag/v1.1.8">
+  <a href="https://github.com/Rainchen537/DockWindowPreview/releases/tag/v1.1.9">
     <img alt="Release" src="https://img.shields.io/github/v/release/Rainchen537/DockWindowPreview?style=for-the-badge&color=1f8fff">
   </a>
   <img alt="macOS" src="https://img.shields.io/badge/macOS-13%2B-111827?style=for-the-badge&logo=apple">
@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Rainchen537/DockWindowPreview/releases/download/v1.1.8/Y-Dock-v1.1.8.dmg">
+  <a href="https://github.com/Rainchen537/DockWindowPreview/releases/download/v1.1.9/Y-Dock-v1.1.9.dmg">
     <img alt="Download DMG" src="https://img.shields.io/badge/Download-DMG-2563EB?style=for-the-badge&logo=github">
   </a>
 </p>
@@ -44,14 +44,14 @@
 | 💤 唤回最小化窗口 | 被最小化的窗口也会出现在预览里，点击后自动恢复并置前。 |
 | 🎚 卡片窗口控制 | hover 某个窗口卡片，左上角显示退出 App、关闭窗口、最小化窗口三颗控制按钮。 |
 | 🎯 临时聚焦预览 | hover 卡片超过 `50ms` 后，用轻量覆盖层突出当前窗口快照，不改变真实桌面状态。 |
-| 🎛 设置面板 | 可调整悬停延迟、缩略图高度、标题显示、开机启动和调试日志。 |
+| 🎛 设置窗口 | 独立设置窗口采用左侧栏和右侧内容区，可调整悬停延迟、缩略图高度、标题显示、开机启动和调试日志。 |
 | ⬇️ 直接更新 | 检测到新版本后可直接下载、替换并重启，不需要手动拖拽 DMG。 |
 | 🔐 公开 API 实现 | 使用 AppKit、Accessibility、CoreGraphics，不依赖 macOS 私有 API。 |
 
 ## 📦 安装
 
 1. 下载最新版 DMG：  
-   [Y-Dock-v1.1.8.dmg](https://github.com/Rainchen537/DockWindowPreview/releases/download/v1.1.8/Y-Dock-v1.1.8.dmg)
+   [Y-Dock-v1.1.9.dmg](https://github.com/Rainchen537/DockWindowPreview/releases/download/v1.1.9/Y-Dock-v1.1.9.dmg)
 2. 打开 DMG。
 3. 将 `Y-Dock.app` 拖到 `Applications`。
 4. 启动 `Y-Dock`，按提示开启权限。

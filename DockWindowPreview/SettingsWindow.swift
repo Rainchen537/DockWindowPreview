@@ -1,12 +1,9 @@
 import AppKit
 import Foundation
 
-final class SettingsPopoverController: NSObject, NSPopoverDelegate {
-    private let viewController: SettingsViewController
-    private let popover: NSPopover
-    private weak var anchorButton: NSStatusBarButton?
-    private var localEventMonitor: Any?
-    private var globalEventMonitor: Any?
+final class SettingsWindowController: NSObject {
+    private let contentController: SettingsContentController
+    private let windowController: YSettingWindowController
 
     init(
         settings: AppSettings = .shared,
@@ -14,108 +11,62 @@ final class SettingsPopoverController: NSObject, NSPopoverDelegate {
         launchAtLoginManager: LaunchAtLoginManager = LaunchAtLoginManager(),
         updateChecker: UpdateChecker = .shared
     ) {
-        viewController = SettingsViewController(
+        contentController = SettingsContentController(
             settings: settings,
             permissionsManager: permissionsManager,
             launchAtLoginManager: launchAtLoginManager,
             updateChecker: updateChecker
         )
 
-        popover = NSPopover()
-        popover.behavior = .transient
-        popover.animates = true
-        popover.contentViewController = viewController
+        let descriptor = YSettingAppDescriptor(
+            displayName: AppBranding.displayName,
+            subtitle: "Dock 多窗口预览",
+            version: "v\(updateChecker.currentVersion)",
+            icon: AppIconFactory.appIcon(size: 78)
+        )
+        let items = [
+            YSettingSidebarItem("preview", title: "预览", symbolName: "rectangle.3.group"),
+            YSettingSidebarItem("system", title: "系统", symbolName: "power"),
+            YSettingSidebarItem("permissions", title: "权限", symbolName: "lock.shield"),
+            YSettingSidebarItem("about", title: "关于", symbolName: "info.circle")
+        ]
+        let contentController = contentController
+        windowController = YSettingWindowController(
+            descriptor: descriptor,
+            sidebarItems: items,
+            initialIdentifier: "preview"
+        ) { identifier in
+            contentController.makeContent(for: identifier)
+        }
+
         super.init()
-        popover.delegate = self
-    }
 
-    deinit {
-        removeEventMonitors()
-    }
-
-    var isShown: Bool {
-        popover.isShown
-    }
-
-    func toggle(relativeTo button: NSStatusBarButton, requestPermissions: Bool = false) {
-        if popover.isShown {
-            popover.performClose(nil)
-        } else {
-            show(relativeTo: button, requestPermissions: requestPermissions)
+        windowController.onClose = { [weak self] in
+            self?.contentController.stopPresentation()
         }
     }
 
-    func show(relativeTo button: NSStatusBarButton, requestPermissions: Bool = false) {
-        anchorButton = button
-        viewController.refreshForPresentation()
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        installEventMonitors()
+    var isShown: Bool {
+        windowController.isVisible
+    }
+
+    func show(requestPermissions: Bool = false) {
+        contentController.refreshForPresentation()
+        contentController.startPresentation()
+        windowController.showAndActivate()
 
         guard requestPermissions else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-            self?.viewController.requestMissingPermissions()
+            self?.contentController.requestMissingPermissions()
         }
     }
 
     func close() {
-        popover.performClose(nil)
-        removeEventMonitors()
-        anchorButton = nil
-    }
-
-    func popoverDidClose(_ notification: Notification) {
-        removeEventMonitors()
-        anchorButton = nil
-    }
-
-    private func installEventMonitors() {
-        removeEventMonitors()
-
-        let mask: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
-        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
-            guard let self else { return event }
-
-            if self.popover.isShown, !self.shouldKeepPopoverOpen(for: event) {
-                self.close()
-            }
-
-            return event
-        }
-
-        globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] _ in
-            DispatchQueue.main.async {
-                self?.close()
-            }
-        }
-    }
-
-    private func removeEventMonitors() {
-        if let localEventMonitor {
-            NSEvent.removeMonitor(localEventMonitor)
-            self.localEventMonitor = nil
-        }
-
-        if let globalEventMonitor {
-            NSEvent.removeMonitor(globalEventMonitor)
-            self.globalEventMonitor = nil
-        }
-    }
-
-    private func shouldKeepPopoverOpen(for event: NSEvent) -> Bool {
-        if let popoverWindow = viewController.view.window, event.window === popoverWindow {
-            return true
-        }
-
-        guard let button = anchorButton, event.window === button.window else {
-            return false
-        }
-
-        let pointInButton = button.convert(event.locationInWindow, from: nil)
-        return button.bounds.contains(pointInButton)
+        windowController.close()
     }
 }
 
-private final class SettingsViewController: NSViewController {
+private final class SettingsContentController {
     private let settings: AppSettings
     private let permissionsManager: PermissionsManager
     private let launchAtLoginManager: LaunchAtLoginManager
@@ -123,29 +74,30 @@ private final class SettingsViewController: NSViewController {
     private let githubURL = AppBranding.repositoryURL
 
     private let hoverDelaySlider = NSSlider(value: 0.10, minValue: 0.05, maxValue: 0.8, target: nil, action: nil)
-    private let hoverDelayValuePill = SettingsPill(text: "100 ms", tone: .accent)
+    private let hoverDelayValuePill = YSettingPill(text: "100 ms", tone: .accent)
     private let thumbnailSlider = NSSlider(value: 165, minValue: 100, maxValue: 260, target: nil, action: nil)
-    private let thumbnailValuePill = SettingsPill(text: "165 px", tone: .neutral)
-    private let launchAtLoginStatusPill = SettingsPill(text: "未开启", tone: .neutral)
-    private let updateStatusPill = SettingsPill(text: "", tone: .neutral)
-    private let accessibilityStatusPill = SettingsPill(text: "检测中", tone: .neutral)
-    private let screenCaptureStatusPill = SettingsPill(text: "检测中", tone: .neutral)
-    private let optionTabShortcutPill = SettingsPill(text: "⌥ Tab", tone: .accent)
+    private let thumbnailValuePill = YSettingPill(text: "165 px", tone: .neutral)
+    private let launchAtLoginStatusPill = YSettingPill(text: "未开启", tone: .neutral)
+    private let updateStatusPill = YSettingPill(text: "", tone: .neutral)
+    private let accessibilityStatusPill = YSettingPill(text: "检测中", tone: .neutral)
+    private let screenCaptureStatusPill = YSettingPill(text: "检测中", tone: .neutral)
+    private let optionTabShortcutPill = YSettingPill(text: "⌥ Tab", tone: .accent)
 
-    private lazy var showTitleSwitch = makeSwitch(action: #selector(showTitleChanged(_:)))
-    private lazy var launchAtLoginSwitch = makeSwitch(action: #selector(launchAtLoginChanged(_:)))
-    private lazy var debugSwitch = makeSwitch(action: #selector(debugChanged(_:)))
+    private lazy var showTitleSwitch = YSettingUI.makeSwitch(target: self, action: #selector(showTitleChanged(_:)))
+    private lazy var launchAtLoginSwitch = YSettingUI.makeSwitch(target: self, action: #selector(launchAtLoginChanged(_:)))
+    private lazy var debugSwitch = YSettingUI.makeSwitch(target: self, action: #selector(debugChanged(_:)))
     private lazy var openLoginItemsButton = makeButton(title: "登录项", symbolName: "person.crop.circle.badge.checkmark", action: #selector(openLoginItemsSettings))
-    private lazy var checkUpdatesButton = makeButton(title: "检查更新", symbolName: "arrow.triangle.2.circlepath", action: #selector(checkForUpdatesClicked))
-    private lazy var githubButton = makeButton(title: "GitHub", symbolName: "chevron.left.forwardslash.chevron.right", action: #selector(openGitHub))
+    private lazy var checkUpdatesButton = makeButton(title: "检查更新", symbolName: "arrow.triangle.2.circlepath", role: .primary, action: #selector(checkForUpdatesClicked))
+    private lazy var githubButton = makeButton(title: "GitHub", symbolName: "chevron.left.forwardslash.chevron.right", role: .link, action: #selector(openGitHub))
     private lazy var requestAccessibilityButton = makeButton(title: "请求", symbolName: "hand.raised", action: #selector(requestAccessibilityPermission))
     private lazy var openAccessibilityButton = makeButton(title: "打开", symbolName: "gearshape", action: #selector(openAccessibilitySettings))
     private lazy var requestScreenCaptureButton = makeButton(title: "请求", symbolName: "rectangle.on.rectangle", action: #selector(requestScreenCapturePermission))
     private lazy var openScreenCaptureButton = makeButton(title: "打开", symbolName: "gearshape", action: #selector(openScreenCaptureSettings))
-    private lazy var requestAllButton = makeButton(title: "请求缺失权限", symbolName: "lock.open", action: #selector(requestAllPermissions))
+    private lazy var requestAllButton = makeButton(title: "请求缺失权限", symbolName: "lock.open", role: .primary, action: #selector(requestAllPermissions))
     private lazy var recheckButton = makeButton(title: "重新检测", symbolName: "checkmark.shield", action: #selector(recheckPermissions))
 
     private var permissionRefreshTimer: Timer?
+    private var isObservingApplicationActivation = false
 
     init(
         settings: AppSettings,
@@ -157,228 +109,210 @@ private final class SettingsViewController: NSViewController {
         self.permissionsManager = permissionsManager
         self.launchAtLoginManager = launchAtLoginManager
         self.updateChecker = updateChecker
-        super.init(nibName: nil, bundle: nil)
-        preferredContentSize = NSSize(width: SettingsUI.panelWidth, height: SettingsUI.panelHeight)
-    }
-
-    required init?(coder: NSCoder) {
-        nil
+        configureControls()
+        refreshValues()
     }
 
     deinit {
-        permissionRefreshTimer?.invalidate()
-        NotificationCenter.default.removeObserver(self)
+        stopPresentation()
     }
 
-    override func loadView() {
-        let rootView = SettingsUI.rootView()
-        view = rootView
-
-        buildUI(in: rootView)
-        refreshValues()
-    }
-
-    override func viewDidAppear() {
-        super.viewDidAppear()
-        startPermissionRefreshTimer()
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(recheckPermissions),
-            name: NSApplication.didBecomeActiveNotification,
-            object: nil
-        )
-    }
-
-    override func viewWillDisappear() {
-        super.viewWillDisappear()
-        permissionRefreshTimer?.invalidate()
-        permissionRefreshTimer = nil
-        NotificationCenter.default.removeObserver(self, name: NSApplication.didBecomeActiveNotification, object: nil)
+    func makeContent(for identifier: String) -> NSView {
+        switch identifier {
+        case "system":
+            return systemContent()
+        case "permissions":
+            return permissionsContent()
+        case "about":
+            return aboutContent()
+        default:
+            return previewContent()
+        }
     }
 
     func refreshForPresentation() {
-        guard isViewLoaded else { return }
         refreshValues()
     }
 
-    private func buildUI(in rootView: NSView) {
-        hoverDelaySlider.target = self
-        hoverDelaySlider.action = #selector(hoverDelayChanged(_:))
-        thumbnailSlider.target = self
-        thumbnailSlider.action = #selector(thumbnailSizeChanged(_:))
-        updateStatusPill.setText("v\(updateChecker.currentVersion)", tone: .neutral)
-
-        let scrollView = SettingsUI.scrollView()
-        let documentView = NSView()
-        documentView.translatesAutoresizingMaskIntoConstraints = false
-        let stack = SettingsUI.contentStack()
-
-        documentView.addSubview(stack)
-        scrollView.documentView = documentView
-        rootView.addSubview(scrollView)
-
-        stack.addArrangedSubview(headerView())
-        stack.addArrangedSubview(previewCard())
-        stack.addArrangedSubview(systemCard())
-        stack.addArrangedSubview(permissionsCard())
-        stack.addArrangedSubview(aboutCard())
-
-        NSLayoutConstraint.activate([
-            scrollView.leadingAnchor.constraint(equalTo: rootView.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: rootView.trailingAnchor),
-            scrollView.topAnchor.constraint(equalTo: rootView.topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: rootView.bottomAnchor),
-
-            documentView.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
-            documentView.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
-            documentView.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
-            documentView.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
-
-            stack.leadingAnchor.constraint(equalTo: documentView.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: documentView.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: documentView.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: documentView.bottomAnchor)
-        ])
+    func startPresentation() {
+        startPermissionRefreshTimer()
+        if !isObservingApplicationActivation {
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(recheckPermissions),
+                name: NSApplication.didBecomeActiveNotification,
+                object: nil
+            )
+            isObservingApplicationActivation = true
+        }
     }
 
-    private func headerView() -> NSView {
-        SettingsHeaderView(
-            icon: AppIconFactory.appIcon(size: 52),
-            title: AppBranding.displayName,
-            subtitle: "Dock 多窗口预览 · v\(updateChecker.currentVersion)"
+    func stopPresentation() {
+        permissionRefreshTimer?.invalidate()
+        permissionRefreshTimer = nil
+        if isObservingApplicationActivation {
+            NotificationCenter.default.removeObserver(self, name: NSApplication.didBecomeActiveNotification, object: nil)
+            isObservingApplicationActivation = false
+        }
+    }
+
+    private func previewContent() -> NSView {
+        let stack = YSettingUI.makeContentStack(
+            title: "预览",
+            symbolName: "rectangle.3.group",
+            subtitle: "设置 Dock 悬浮预览和窗口缩略图的响应方式。"
         )
-    }
 
-    private func previewCard() -> NSView {
-        let card = SettingsCardView(title: "预览", symbolName: "rectangle.3.group")
-        card.stack.addArrangedSubview(sliderRow(title: "悬停延迟", slider: hoverDelaySlider, valueLabel: hoverDelayValuePill))
-        card.stack.addArrangedSubview(sliderRow(title: "缩略图高度", slider: thumbnailSlider, valueLabel: thumbnailValuePill))
-        card.stack.addArrangedSubview(SettingsUI.divider())
-        card.stack.addArrangedSubview(switchRow(title: "显示窗口标题", trailingView: showTitleSwitch))
-        card.stack.addArrangedSubview(switchRow(title: "启用调试日志", trailingView: debugSwitch))
-        return card
-    }
-
-    private func systemCard() -> NSView {
-        let card = SettingsCardView(title: "系统", symbolName: "power")
-        card.stack.addArrangedSubview(statusSwitchActionRow(
-            title: "开机启动",
-            statusPill: launchAtLoginStatusPill,
-            switchControl: launchAtLoginSwitch,
-            actionButton: openLoginItemsButton
+        stack.addArrangedSubview(YSettingSectionView(
+            title: "Dock 悬浮预览",
+            symbolName: "dock.rectangle",
+            views: [
+                YSettingUI.sliderRow(title: "悬停延迟", slider: hoverDelaySlider, valueView: hoverDelayValuePill),
+                YSettingUI.sliderRow(title: "缩略图高度", slider: thumbnailSlider, valueView: thumbnailValuePill),
+                YSettingUI.divider(),
+                YSettingUI.row(title: "显示窗口标题", trailingView: showTitleSwitch),
+                YSettingUI.row(title: "启用调试日志", trailingView: debugSwitch)
+            ]
         ))
-        card.stack.addArrangedSubview(SettingsUI.divider())
-        card.stack.addArrangedSubview(statusRow(title: "窗口切换", statusPill: nil, trailingView: optionTabShortcutPill))
-        return card
-    }
 
-    private func permissionsCard() -> NSView {
-        let card = SettingsCardView(title: "权限", symbolName: "lock.shield")
-        card.stack.addArrangedSubview(permissionRow(
-            title: "辅助功能",
-            statusPill: accessibilityStatusPill,
-            requestButton: requestAccessibilityButton,
-            openButton: openAccessibilityButton
-        ))
-        card.stack.addArrangedSubview(permissionRow(
-            title: "屏幕录制",
-            statusPill: screenCaptureStatusPill,
-            requestButton: requestScreenCaptureButton,
-            openButton: openScreenCaptureButton
-        ))
-        card.stack.addArrangedSubview(actionRow(primary: requestAllButton, secondary: recheckButton))
-        return card
-    }
-
-    private func aboutCard() -> NSView {
-        let card = SettingsCardView(title: "关于", symbolName: "info.circle")
-        card.stack.addArrangedSubview(statusRow(title: "当前版本", statusPill: updateStatusPill, trailingView: checkUpdatesButton))
-        card.stack.addArrangedSubview(statusRow(title: "项目主页", statusPill: nil, trailingView: githubButton))
-        return card
-    }
-
-    private func sliderRow(title: String, slider: NSSlider, valueLabel: SettingsPill) -> NSView {
-        let label = SettingsUI.rowTitle(title)
-        valueLabel.setContentHuggingPriority(.required, for: .horizontal)
-
-        let topRow = NSStackView(views: [label, SettingsUI.spacer(), valueLabel])
-        topRow.orientation = .horizontal
-        topRow.alignment = .centerY
-
-        slider.controlSize = .small
-
-        let stack = NSStackView(views: [topRow, slider])
-        stack.orientation = .vertical
-        stack.spacing = 4
         return stack
     }
 
-    private func switchRow(title: String, trailingView: NSView) -> NSView {
-        statusRow(title: title, statusPill: nil, trailingView: trailingView)
+    private func systemContent() -> NSView {
+        let stack = YSettingUI.makeContentStack(
+            title: "系统",
+            symbolName: "power",
+            subtitle: "控制开机启动和全局窗口切换入口。"
+        )
+
+        stack.addArrangedSubview(YSettingSectionView(
+            title: "后台运行",
+            symbolName: "menubar.rectangle",
+            views: [
+                statusSwitchActionRow(
+                    title: "开机启动",
+                    statusPill: launchAtLoginStatusPill,
+                    switchControl: launchAtLoginSwitch,
+                    actionButton: openLoginItemsButton
+                ),
+                YSettingUI.divider(),
+                statusRow(title: "窗口切换", statusPill: nil, trailingView: optionTabShortcutPill)
+            ]
+        ))
+
+        return stack
     }
 
-    private func statusSwitchRow(title: String, statusPill: SettingsPill, switchControl: NSSwitch) -> NSView {
-        let trailing = NSStackView(views: [statusPill, switchControl])
-        trailing.orientation = .horizontal
-        trailing.spacing = 8
-        trailing.alignment = .centerY
-        return statusRow(title: title, statusPill: nil, trailingView: trailing)
+    private func permissionsContent() -> NSView {
+        let stack = YSettingUI.makeContentStack(
+            title: "权限",
+            symbolName: "lock.shield",
+            subtitle: "Y-Dock 使用公开 API，需要系统授权才能读取 Dock 和窗口缩略图。"
+        )
+
+        let hint = YSettingUI.secondaryLabel("辅助功能用于读取 Dock、恢复最小化窗口和聚焦指定窗口；屏幕录制用于生成其他 App 的窗口缩略图。开启屏幕录制后通常需要重启 App。")
+
+        stack.addArrangedSubview(YSettingSectionView(
+            title: "隐私权限",
+            symbolName: "checkmark.shield",
+            views: [
+                permissionRow(
+                    title: "辅助功能",
+                    statusPill: accessibilityStatusPill,
+                    requestButton: requestAccessibilityButton,
+                    openButton: openAccessibilityButton
+                ),
+                permissionRow(
+                    title: "屏幕录制",
+                    statusPill: screenCaptureStatusPill,
+                    requestButton: requestScreenCaptureButton,
+                    openButton: openScreenCaptureButton
+                ),
+                actionRow(primary: requestAllButton, secondary: recheckButton),
+                hint
+            ]
+        ))
+
+        return stack
+    }
+
+    private func aboutContent() -> NSView {
+        let stack = YSettingUI.makeContentStack(
+            title: "关于",
+            symbolName: "info.circle",
+            subtitle: "版本、更新和项目主页。"
+        )
+
+        stack.addArrangedSubview(YSettingSectionView(
+            title: "版本",
+            symbolName: "sparkles",
+            views: [
+                statusRow(title: "当前版本", statusPill: updateStatusPill, trailingView: checkUpdatesButton),
+                statusRow(title: "项目主页", statusPill: nil, trailingView: githubButton)
+            ]
+        ))
+
+        return stack
     }
 
     private func statusSwitchActionRow(
         title: String,
-        statusPill: SettingsPill,
+        statusPill: YSettingPill,
         switchControl: NSSwitch,
         actionButton: NSButton
     ) -> NSView {
-        let trailing = NSStackView(views: [statusPill, switchControl, actionButton])
-        trailing.orientation = .horizontal
-        trailing.spacing = 8
-        trailing.alignment = .centerY
+        let trailing = YSettingUI.horizontal([statusPill, switchControl, actionButton])
         return statusRow(title: title, statusPill: nil, trailingView: trailing)
     }
 
-    private func statusRow(title: String, statusPill: SettingsPill?, trailingView: NSView) -> NSView {
-        let titleLabel = SettingsUI.rowTitle(title)
-        let views = statusPill.map { [titleLabel, SettingsUI.spacer(), $0, trailingView] } ?? [titleLabel, SettingsUI.spacer(), trailingView]
-        let row = NSStackView(views: views)
-        row.orientation = .horizontal
-        row.spacing = SettingsUI.rowSpacing
-        row.alignment = .centerY
-        return row
+    private func statusRow(title: String, statusPill: YSettingPill?, trailingView: NSView) -> NSView {
+        if let statusPill {
+            return YSettingUI.row(title: title, trailingView: YSettingUI.horizontal([statusPill, trailingView]))
+        }
+
+        return YSettingUI.row(title: title, trailingView: trailingView)
     }
 
     private func permissionRow(
         title: String,
-        statusPill: SettingsPill,
+        statusPill: YSettingPill,
         requestButton: NSButton,
         openButton: NSButton
     ) -> NSView {
-        requestButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 58).isActive = true
-        openButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 58).isActive = true
-
-        let actions = NSStackView(views: [requestButton, openButton])
-        actions.orientation = .horizontal
-        actions.spacing = 6
-        actions.alignment = .centerY
+        requestButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 62).isActive = true
+        openButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 62).isActive = true
+        let actions = YSettingUI.horizontal([requestButton, openButton], spacing: 6)
         return statusRow(title: title, statusPill: statusPill, trailingView: actions)
     }
 
     private func actionRow(primary: NSButton, secondary: NSButton? = nil) -> NSView {
         let actions = secondary.map { [primary, $0] } ?? [primary]
-        let row = NSStackView(views: [SettingsUI.spacer()] + actions)
+        let row = NSStackView(views: [YSettingUI.spacer()] + actions)
         row.orientation = .horizontal
-        row.spacing = 7
+        row.spacing = 8
         row.alignment = .centerY
         return row
     }
 
-    private func makeSwitch(action: Selector) -> NSSwitch {
-        SettingsUI.makeSwitch(target: self, action: action)
+    private func makeButton(
+        title: String,
+        symbolName: String,
+        role: YSettingButtonRole = .secondary,
+        action: Selector
+    ) -> NSButton {
+        YSettingUI.makeButton(title: title, symbolName: symbolName, role: role, target: self, action: action)
     }
 
-    private func makeButton(title: String, symbolName: String, action: Selector) -> NSButton {
-        SettingsUI.makeButton(title: title, symbolName: symbolName, target: self, action: action)
+    private func configureControls() {
+        hoverDelaySlider.target = self
+        hoverDelaySlider.action = #selector(hoverDelayChanged(_:))
+        hoverDelaySlider.controlSize = .small
+
+        thumbnailSlider.target = self
+        thumbnailSlider.action = #selector(thumbnailSizeChanged(_:))
+        thumbnailSlider.controlSize = .small
+
+        updateStatusPill.setText("v\(updateChecker.currentVersion)", tone: .neutral)
     }
 
     private func refreshValues() {

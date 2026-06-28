@@ -22,9 +22,9 @@
 		100000000000000000000013 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000115 /* AppIcon.icns */; };
 		100000000000000000000014 /* LaunchAtLoginManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000116 /* LaunchAtLoginManager.swift */; };
 		100000000000000000000015 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000117 /* UpdateChecker.swift */; };
-		100000000000000000000016 /* SettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000118 /* SettingsComponents.swift */; };
 		100000000000000000000017 /* FocusOverlayPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000119 /* FocusOverlayPanel.swift */; };
 		100000000000000000000018 /* OptionTabSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000120 /* OptionTabSwitcher.swift */; };
+		100000000000000000000019 /* YSettingsFramework.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000121 /* YSettingsFramework.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,9 +45,9 @@
 		100000000000000000000115 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
 		100000000000000000000116 /* LaunchAtLoginManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginManager.swift; sourceTree = "<group>"; };
 		100000000000000000000117 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
-		100000000000000000000118 /* SettingsComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsComponents.swift; sourceTree = "<group>"; };
 		100000000000000000000119 /* FocusOverlayPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusOverlayPanel.swift; sourceTree = "<group>"; };
 		100000000000000000000120 /* OptionTabSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OptionTabSwitcher.swift; sourceTree = "<group>"; };
+		100000000000000000000121 /* YSettingsFramework.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Y-Framework/Setting/YSettingsFramework.swift"; sourceTree = SOURCE_ROOT; };
 		100000000000000000000201 /* Y-Dock.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Y-Dock.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -68,6 +68,7 @@
 				100000000000000000000402 /* DockWindowPreview */,
 				100000000000000000000403 /* Products */,
 				100000000000000000000112 /* README.md */,
+				100000000000000000000121 /* YSettingsFramework.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -87,7 +88,6 @@
 				100000000000000000000120 /* OptionTabSwitcher.swift */,
 				100000000000000000000109 /* WindowActivator.swift */,
 				100000000000000000000110 /* SettingsWindow.swift */,
-				100000000000000000000118 /* SettingsComponents.swift */,
 				100000000000000000000114 /* AppIconFactory.swift */,
 				100000000000000000000116 /* LaunchAtLoginManager.swift */,
 				100000000000000000000117 /* UpdateChecker.swift */,
@@ -184,11 +184,11 @@
 				100000000000000000000007 /* WindowThumbnailProvider.swift in Sources */,
 				100000000000000000000008 /* PreviewPanel.swift in Sources */,
 				100000000000000000000009 /* WindowActivator.swift in Sources */,
+				100000000000000000000019 /* YSettingsFramework.swift in Sources */,
 				100000000000000000000010 /* SettingsWindow.swift in Sources */,
 				100000000000000000000012 /* AppIconFactory.swift in Sources */,
 				100000000000000000000014 /* LaunchAtLoginManager.swift in Sources */,
 				100000000000000000000015 /* UpdateChecker.swift in Sources */,
-				100000000000000000000016 /* SettingsComponents.swift in Sources */,
 				100000000000000000000017 /* FocusOverlayPanel.swift in Sources */,
 				100000000000000000000018 /* OptionTabSwitcher.swift in Sources */,
 			);
@@ -319,7 +319,7 @@
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 33;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_LANGUAGE = en;
 				DEVELOPMENT_TEAM = A94225N8T5;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -330,7 +330,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.1.8;
+				MARKETING_VERSION = 1.1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.lixingchen.DockWindowPreview;
 				PRODUCT_NAME = "Y-Dock";
 				SWIFT_VERSION = 5.0;
@@ -344,7 +344,7 @@
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 33;
+				CURRENT_PROJECT_VERSION = 34;
 				DEVELOPMENT_LANGUAGE = en;
 				DEVELOPMENT_TEAM = A94225N8T5;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -355,7 +355,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 1.1.8;
+				MARKETING_VERSION = 1.1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.lixingchen.DockWindowPreview;
 				PRODUCT_NAME = "Y-Dock";
 				SWIFT_VERSION = 5.0;

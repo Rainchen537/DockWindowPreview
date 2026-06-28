@@ -2,6 +2,13 @@
 
 All notable Y-Dock release changes are tracked here.
 
+## v1.1.9 - 2026-06-28
+
+- Reworked settings from the menu bar popover into an independent sidebar settings window using the shared Y-Project settings shell.
+- Simplified the menu bar item to open settings, reserve a More Y-Project entry, and quit the app.
+- Preserved existing preview tuning, permission, update, launch-at-login, and debug controls inside the new settings window.
+- Vendored the shared Y-Project settings framework so the repository can be built independently from GitHub source checkouts.
+
 ## v1.1.8 - 2026-06-27
 
 - Changed Dock right-click handling to immediately close the hover preview and keep previews suppressed until the context-menu interaction ends, avoiding menu misclicks and lower-layer preview stalls.
